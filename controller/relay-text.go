@@ -257,7 +257,6 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 	//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
 	asyncHTTPDo := func(reqs []*http.Request) (*http.Response, error) {
-		fmt.Println("batch req ", len(reqs))
 		tmpReq := reqs[0].Clone(context.Background())
 		ch := make(chan *http.Response)
 		var anySuccess bool
@@ -308,7 +307,6 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	asyncNum := c.GetInt("async_num")
 	var resp *http.Response
 	if asyncNum <= 1 {
-		println(asyncNum)
 		resp, err = httpClient.Do(req)
 	} else {
 		requests := make([]*http.Request, asyncNum)

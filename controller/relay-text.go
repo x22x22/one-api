@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"one-api/common"
 	"one-api/model"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -254,7 +256,67 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 	//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
-	resp, err := httpClient.Do(req)
+	asyncHTTPDo := func(reqs []*http.Request) (*http.Response, error) {
+		fmt.Println("batch req ", len(reqs))
+		tmpReq := reqs[0].Clone(context.Background())
+		ch := make(chan *http.Response)
+		var anySuccess bool
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		reqCh := make(chan *http.Request)
+		defer close(reqCh)
+
+		go func() {
+			for req := range reqCh {
+				go func(req *http.Request) {
+					req.WithContext(ctx)
+					resp, _ := httpClient.Do(req)
+					if resp.StatusCode == 200 {
+						ch <- resp
+					}
+				}(req)
+			}
+		}()
+
+		for _, req := range reqs {
+			reqCh <- req
+		}
+		addTime := time.After(5 * time.Second)
+		// 设置一个定时器，如果超过一定时间没有任何响应，就返回 nil
+		timeout := time.After(15 * time.Second)
+
+		for {
+			select {
+			case <-addTime:
+				reqCh <- tmpReq
+			case resp := <-ch:
+				// 如果接收到一个回应，那么取消其余请求并回应
+				anySuccess = true
+				cancel()
+				return resp, nil
+
+			case <-timeout:
+				// 如果超时，确保所有的 goroutine 都被 cancel 并返回 nil
+				if !anySuccess {
+					cancel()
+					return nil, fmt.Errorf("请求超时")
+				}
+			}
+		}
+	}
+	asyncNum := c.GetInt("async_num")
+	var resp *http.Response
+	if asyncNum <= 1 {
+		println(asyncNum)
+		resp, err = httpClient.Do(req)
+	} else {
+		requests := make([]*http.Request, asyncNum)
+		for i := 0; i < asyncNum; i++ {
+			requests[i] = req.Clone(context.Background())
+		}
+		resp, err = asyncHTTPDo(requests)
+	}
 	if err != nil {
 		return errorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}

@@ -22,6 +22,8 @@ const (
 	APITypePaLM
 	APITypeBaidu
 	APITypeZhipu
+	APITypeAli
+	APITypeXunfei
 )
 
 var httpClient *http.Client
@@ -75,7 +77,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	// map model name
 	modelMapping := c.GetString("model_mapping")
 	isModelMapped := false
-	if modelMapping != "" {
+	if modelMapping != "" && modelMapping != "{}" {
 		modelMap := make(map[string]string)
 		err := json.Unmarshal([]byte(modelMapping), &modelMap)
 		if err != nil {
@@ -96,6 +98,10 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		apiType = APITypePaLM
 	case common.ChannelTypeZhipu:
 		apiType = APITypeZhipu
+	case common.ChannelTypeAli:
+		apiType = APITypeAli
+	case common.ChannelTypeXunfei:
+		apiType = APITypeXunfei
 	}
 	baseURL := common.ChannelBaseURLs[channelType]
 	requestURL := c.Request.URL.String()
@@ -137,6 +143,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			fullRequestURL = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/eb-instant"
 		case "BLOOMZ-7B":
 			fullRequestURL = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/bloomz_7b1"
+		case "Embedding-V1":
+			fullRequestURL = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/embeddings/embedding-v1"
 		}
 		apiKey := c.Request.Header.Get("Authorization")
 		apiKey = strings.TrimPrefix(apiKey, "Bearer ")
@@ -155,6 +163,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			method = "sse-invoke"
 		}
 		fullRequestURL = fmt.Sprintf("https://open.bigmodel.cn/api/paas/v3/model-api/%s/%s", textRequest.Model, method)
+	case APITypeAli:
+		fullRequestURL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 	}
 	var promptTokens int
 	var completionTokens int
@@ -208,12 +218,20 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		}
 		requestBody = bytes.NewBuffer(jsonStr)
 	case APITypeBaidu:
-		baiduRequest := requestOpenAI2Baidu(textRequest)
-		jsonStr, err := json.Marshal(baiduRequest)
+		var jsonData []byte
+		var err error
+		switch relayMode {
+		case RelayModeEmbeddings:
+			baiduEmbeddingRequest := embeddingRequestOpenAI2Baidu(textRequest)
+			jsonData, err = json.Marshal(baiduEmbeddingRequest)
+		default:
+			baiduRequest := requestOpenAI2Baidu(textRequest)
+			jsonData, err = json.Marshal(baiduRequest)
+		}
 		if err != nil {
 			return errorWrapper(err, "marshal_text_request_failed", http.StatusInternalServerError)
 		}
-		requestBody = bytes.NewBuffer(jsonStr)
+		requestBody = bytes.NewBuffer(jsonData)
 	case APITypePaLM:
 		palmRequest := requestOpenAI2PaLM(textRequest)
 		jsonStr, err := json.Marshal(palmRequest)
@@ -228,107 +246,126 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			return errorWrapper(err, "marshal_text_request_failed", http.StatusInternalServerError)
 		}
 		requestBody = bytes.NewBuffer(jsonStr)
-	}
-	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
-	if err != nil {
-		return errorWrapper(err, "new_request_failed", http.StatusInternalServerError)
-	}
-	apiKey := c.Request.Header.Get("Authorization")
-	apiKey = strings.TrimPrefix(apiKey, "Bearer ")
-	switch apiType {
-	case APITypeOpenAI:
-		if channelType == common.ChannelTypeAzure {
-			req.Header.Set("api-key", apiKey)
-		} else {
-			req.Header.Set("Authorization", c.Request.Header.Get("Authorization"))
+	case APITypeAli:
+		aliRequest := requestOpenAI2Ali(textRequest)
+		jsonStr, err := json.Marshal(aliRequest)
+		if err != nil {
+			return errorWrapper(err, "marshal_text_request_failed", http.StatusInternalServerError)
 		}
-	case APITypeClaude:
-		req.Header.Set("x-api-key", apiKey)
-		anthropicVersion := c.Request.Header.Get("anthropic-version")
-		if anthropicVersion == "" {
-			anthropicVersion = "2023-06-01"
-		}
-		req.Header.Set("anthropic-version", anthropicVersion)
-	case APITypeZhipu:
-		token := getZhipuToken(apiKey)
-		req.Header.Set("Authorization", token)
+		requestBody = bytes.NewBuffer(jsonStr)
 	}
-	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
-	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
-	//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
-	asyncHTTPDo := func(reqs []*http.Request) (*http.Response, error) {
-		tmpReq := reqs[0].Clone(context.Background())
-		ch := make(chan *http.Response)
-		var anySuccess bool
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
-		reqCh := make(chan *http.Request)
-		defer close(reqCh)
+	var req *http.Request
+	var resp *http.Response
+	isStream := textRequest.Stream
 
-		go func() {
-			for req := range reqCh {
-				go func(req *http.Request) {
-					req.WithContext(ctx)
-					resp, _ := httpClient.Do(req)
-					if resp.StatusCode == 200 {
-						ch <- resp
-					}
-				}(req)
+	if apiType != APITypeXunfei { // cause xunfei use websocket
+		req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+		if err != nil {
+			return errorWrapper(err, "new_request_failed", http.StatusInternalServerError)
+		}
+		apiKey := c.Request.Header.Get("Authorization")
+		apiKey = strings.TrimPrefix(apiKey, "Bearer ")
+		switch apiType {
+		case APITypeOpenAI:
+			if channelType == common.ChannelTypeAzure {
+				req.Header.Set("api-key", apiKey)
+			} else {
+				req.Header.Set("Authorization", c.Request.Header.Get("Authorization"))
 			}
-		}()
-
-		for _, req := range reqs {
-			reqCh <- req
+		case APITypeClaude:
+			req.Header.Set("x-api-key", apiKey)
+			anthropicVersion := c.Request.Header.Get("anthropic-version")
+			if anthropicVersion == "" {
+				anthropicVersion = "2023-06-01"
+			}
+			req.Header.Set("anthropic-version", anthropicVersion)
+		case APITypeZhipu:
+			token := getZhipuToken(apiKey)
+			req.Header.Set("Authorization", token)
+		case APITypeAli:
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+			if textRequest.Stream {
+				req.Header.Set("X-DashScope-SSE", "enable")
+			}
 		}
-		addTime := time.After(5 * time.Second)
-		// 设置一个定时器，如果超过一定时间没有任何响应，就返回 nil
-		timeout := time.After(15 * time.Second)
+		req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
+		req.Header.Set("Accept", c.Request.Header.Get("Accept"))
+		//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
+		asyncHTTPDo := func(reqs []*http.Request) (*http.Response, error) {
+			tmpReq := reqs[0].Clone(context.Background())
+			ch := make(chan *http.Response)
+			var anySuccess bool
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		for {
-			select {
-			case <-addTime:
-				reqCh <- tmpReq
-			case resp := <-ch:
-				// 如果接收到一个回应，那么取消其余请求并回应
-				anySuccess = true
-				cancel()
-				return resp, nil
+			reqCh := make(chan *http.Request)
+			defer close(reqCh)
 
-			case <-timeout:
-				// 如果超时，确保所有的 goroutine 都被 cancel 并返回 nil
-				if !anySuccess {
+			go func() {
+				for req := range reqCh {
+					go func(req *http.Request) {
+						req.WithContext(ctx)
+						resp, _ := httpClient.Do(req)
+						if resp.StatusCode == 200 {
+							ch <- resp
+						}
+					}(req)
+				}
+			}()
+
+			for _, req := range reqs {
+				reqCh <- req
+			}
+			addTime := time.After(5 * time.Second)
+			// 设置一个定时器，如果超过一定时间没有任何响应，就返回 nil
+			timeout := time.After(15 * time.Second)
+
+			for {
+				select {
+				case <-addTime:
+					reqCh <- tmpReq
+				case resp := <-ch:
+					// 如果接收到一个回应，那么取消其余请求并回应
+					anySuccess = true
 					cancel()
-					return nil, fmt.Errorf("请求超时")
+					return resp, nil
+
+				case <-timeout:
+					// 如果超时，确保所有的 goroutine 都被 cancel 并返回 nil
+					if !anySuccess {
+						cancel()
+						return nil, fmt.Errorf("请求超时")
+					}
 				}
 			}
 		}
-	}
-	asyncNum := c.GetInt("async_num")
-	var resp *http.Response
-	if asyncNum <= 1 {
-		resp, err = httpClient.Do(req)
-	} else {
-		requests := make([]*http.Request, asyncNum)
-		for i := 0; i < asyncNum; i++ {
-			requests[i] = req.Clone(context.Background())
+		asyncNum := c.GetInt("async_num")
+		var resp *http.Response
+		if asyncNum <= 1 {
+			resp, err = httpClient.Do(req)
+		} else {
+			requests := make([]*http.Request, asyncNum)
+			for i := 0; i < asyncNum; i++ {
+				requests[i] = req.Clone(context.Background())
+			}
+			resp, err = asyncHTTPDo(requests)
 		}
-		resp, err = asyncHTTPDo(requests)
+		if err != nil {
+			return errorWrapper(err, "do_request_failed", http.StatusInternalServerError)
+		}
+		err = req.Body.Close()
+		if err != nil {
+			return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
+		}
+		err = c.Request.Body.Close()
+		if err != nil {
+			return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
+		}
+		isStream = strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
 	}
-	if err != nil {
-		return errorWrapper(err, "do_request_failed", http.StatusInternalServerError)
-	}
-	err = req.Body.Close()
-	if err != nil {
-		return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
-	}
-	err = c.Request.Body.Close()
-	if err != nil {
-		return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
-	}
+
 	var textResponse TextResponse
-	isStream := strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
-	var streamResponseText string
 
 	defer func() {
 		if consumeQuota {
@@ -340,16 +377,10 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if strings.HasPrefix(textRequest.Model, "gpt-4") {
 				completionRatio = 2
 			}
-			if isStream && apiType != APITypeBaidu && apiType != APITypeZhipu {
-				completionTokens = countTokenText(streamResponseText, textRequest.Model)
-			} else {
-				promptTokens = textResponse.Usage.PromptTokens
-				completionTokens = textResponse.Usage.CompletionTokens
-				if apiType == APITypeZhipu {
-					// zhipu's API does not return prompt tokens & completion tokens
-					promptTokens = textResponse.Usage.TotalTokens
-				}
-			}
+
+			promptTokens = textResponse.Usage.PromptTokens
+			completionTokens = textResponse.Usage.CompletionTokens
+
 			quota = promptTokens + int(float64(completionTokens)*completionRatio)
 			quota = int(float64(quota) * ratio)
 			if ratio != 0 && quota <= 0 {
@@ -387,7 +418,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if err != nil {
 				return err
 			}
-			streamResponseText = responseText
+			textResponse.Usage.PromptTokens = promptTokens
+			textResponse.Usage.CompletionTokens = countTokenText(responseText, textRequest.Model)
 			return nil
 		} else {
 			err, usage := openaiHandler(c, resp, consumeQuota)
@@ -405,7 +437,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if err != nil {
 				return err
 			}
-			streamResponseText = responseText
+			textResponse.Usage.PromptTokens = promptTokens
+			textResponse.Usage.CompletionTokens = countTokenText(responseText, textRequest.Model)
 			return nil
 		} else {
 			err, usage := claudeHandler(c, resp, promptTokens, textRequest.Model)
@@ -428,7 +461,14 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			}
 			return nil
 		} else {
-			err, usage := baiduHandler(c, resp)
+			var err *OpenAIErrorWithStatusCode
+			var usage *Usage
+			switch relayMode {
+			case RelayModeEmbeddings:
+				err, usage = baiduEmbeddingHandler(c, resp)
+			default:
+				err, usage = baiduHandler(c, resp)
+			}
 			if err != nil {
 				return err
 			}
@@ -443,7 +483,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if err != nil {
 				return err
 			}
-			streamResponseText = responseText
+			textResponse.Usage.PromptTokens = promptTokens
+			textResponse.Usage.CompletionTokens = countTokenText(responseText, textRequest.Model)
 			return nil
 		} else {
 			err, usage := palmHandler(c, resp, promptTokens, textRequest.Model)
@@ -464,6 +505,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if usage != nil {
 				textResponse.Usage = *usage
 			}
+			// zhipu's API does not return prompt tokens & completion tokens
+			textResponse.Usage.PromptTokens = textResponse.Usage.TotalTokens
 			return nil
 		} else {
 			err, usage := zhipuHandler(c, resp)
@@ -473,7 +516,48 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if usage != nil {
 				textResponse.Usage = *usage
 			}
+			// zhipu's API does not return prompt tokens & completion tokens
+			textResponse.Usage.PromptTokens = textResponse.Usage.TotalTokens
 			return nil
+		}
+	case APITypeAli:
+		if isStream {
+			err, usage := aliStreamHandler(c, resp)
+			if err != nil {
+				return err
+			}
+			if usage != nil {
+				textResponse.Usage = *usage
+			}
+			return nil
+		} else {
+			err, usage := aliHandler(c, resp)
+			if err != nil {
+				return err
+			}
+			if usage != nil {
+				textResponse.Usage = *usage
+			}
+			return nil
+		}
+	case APITypeXunfei:
+		if isStream {
+			auth := c.Request.Header.Get("Authorization")
+			auth = strings.TrimPrefix(auth, "Bearer ")
+			splits := strings.Split(auth, "|")
+			if len(splits) != 3 {
+				return errorWrapper(errors.New("invalid auth"), "invalid_auth", http.StatusBadRequest)
+			}
+			err, usage := xunfeiStreamHandler(c, textRequest, splits[0], splits[1], splits[2])
+			if err != nil {
+				return err
+			}
+			if usage != nil {
+				textResponse.Usage = *usage
+			}
+			return nil
+		} else {
+			return errorWrapper(errors.New("xunfei api does not support non-stream mode"), "invalid_api_type", http.StatusBadRequest)
 		}
 	default:
 		return errorWrapper(errors.New("unknown api type"), "unknown_api_type", http.StatusInternalServerError)

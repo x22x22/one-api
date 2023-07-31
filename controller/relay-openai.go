@@ -34,6 +34,9 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 			if len(data) < 6 { // ignore blank line or wrong format
 				continue
 			}
+			if data[:6] != "data: " && data[:6] != "[DONE]" {
+				continue
+			}
 			dataChan <- data
 			data = data[6:]
 			if !strings.HasPrefix(data, "[DONE]") {
@@ -43,7 +46,7 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 					err := json.Unmarshal([]byte(data), &streamResponse)
 					if err != nil {
 						common.SysError("error unmarshalling stream response: " + err.Error())
-						return
+						continue // just ignore the error
 					}
 					for _, choice := range streamResponse.Choices {
 						responseText += choice.Delta.Content
@@ -53,7 +56,7 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 					err := json.Unmarshal([]byte(data), &streamResponse)
 					if err != nil {
 						common.SysError("error unmarshalling stream response: " + err.Error())
-						return
+						continue
 					}
 					for _, choice := range streamResponse.Choices {
 						responseText += choice.Text

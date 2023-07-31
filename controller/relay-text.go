@@ -109,7 +109,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		baseURL = c.GetString("base_url")
 	}
 	fullRequestURL := fmt.Sprintf("%s%s", baseURL, requestURL)
-	if c.GetString("full_url") != "" {
+	if c.GetString("full_url") != "" && strings.HasSuffix(requestURL, "chat/completions") {
 		fullRequestURL = c.GetString("full_url")
 	}
 	switch apiType {
@@ -308,8 +308,15 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			go func() {
 				for req := range reqCh {
 					go func(req *http.Request) {
+						defer func() {
+							if r := recover(); r != nil {
+							}
+						}()
 						req.WithContext(ctx)
-						resp, _ := httpClient.Do(req)
+						resp, err := httpClient.Do(req)
+						if err != nil {
+							return
+						}
 						if resp.StatusCode == 200 {
 							ch <- resp
 						}
@@ -344,7 +351,6 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			}
 		}
 		asyncNum := c.GetInt("async_num")
-		var resp *http.Response
 		if asyncNum <= 1 {
 			resp, err = httpClient.Do(req)
 		} else {

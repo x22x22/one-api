@@ -293,7 +293,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			}
 		}
 		if strings.Contains(apiKey, "ignore") {
-			c.Request.Header.Del("Authorization")
+			req.Header.Del("Authorization")
 		}
 		req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 		req.Header.Set("Accept", c.Request.Header.Get("Accept"))

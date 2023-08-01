@@ -107,7 +107,9 @@ func Distribute() func(c *gin.Context) {
 		c.Set("model_mapping", channel.ModelMapping)
 		c.Set("async_num", channel.AsyncNum)
 		c.Set("full_url", channel.FullURL)
-		c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
+		if len(channel.Key) > 6 {
+			c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
+		}
 		c.Set("base_url", channel.BaseURL)
 		if channel.Type == common.ChannelTypeAzure {
 			c.Set("api_version", channel.Other)

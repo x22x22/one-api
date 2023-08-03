@@ -299,7 +299,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 		req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 		//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
-
+		req.Header.Set("HTTP-Referer", "https://one.eqing.tech")
+		req.Header.Set("X-Title", "one-api")
 		asyncNum := c.GetInt("async_num")
 		if asyncNum <= 1 {
 			resp, err = httpClient.Do(req)

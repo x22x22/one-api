@@ -12,6 +12,8 @@ ENV GO111MODULE=on \
     CGO_ENABLED=1 \
     GOOS=linux
 
+ENV GOPROXY=https://goproxy.cn,direct
+
 WORKDIR /build
 COPY . .
 COPY --from=builder /build/build ./web/build

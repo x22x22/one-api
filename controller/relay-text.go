@@ -267,6 +267,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		if err != nil {
 			return errorWrapper(err, "new_request_failed", http.StatusInternalServerError)
 		}
+		req.Header = c.Request.Header.Clone()
 		apiKey := c.Request.Header.Get("Authorization")
 		apiKey = strings.TrimPrefix(apiKey, "Bearer ")
 		switch apiType {

@@ -137,7 +137,7 @@ The initial account username is `root` and password is `123456`.
    cd one-api/web
    npm install
    npm run build
-
+   
    # Build the backend
    cd ..
    go mod download
@@ -172,6 +172,10 @@ If you encounter a blank page after deployment, refer to [#97](https://github.co
 <details>
 <summary><strong>Deploy on Sealos</strong></summary>
 <div>
+
+> Sealos supports high concurrency, dynamic scaling, and stable operations for millions of users.
+
+> Click the button below to deploy with one click.👇
 
 [![](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://cloud.sealos.io/?openapp=system-fastdeploy?templateName=one-api)
 
@@ -279,7 +283,7 @@ If the channel ID is not provided, load balancing will be used to distribute the
     + Double-check that your interface address and API Key are correct.
 
 ## Related Projects
-[FastGPT](https://github.com/c121914yu/FastGPT): Build an AI knowledge base in three minutes
+[FastGPT](https://github.com/labring/FastGPT): Knowledge question answering system based on the LLM
 
 ## Note
 This project is an open-source project. Please use it in compliance with OpenAI's [Terms of Use](https://openai.com/policies/terms-of-use) and **applicable laws and regulations**. It must not be used for illegal purposes.

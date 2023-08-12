@@ -7,14 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
 	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -333,6 +332,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	var textResponse TextResponse
 
 	defer func() {
+		c.Writer.Flush()
 		if consumeQuota {
 			quota := 0
 			completionRatio := 1.0

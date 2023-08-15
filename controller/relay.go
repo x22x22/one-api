@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	jsoniter "github.com/json-iterator/go"
 	"net/http"
 	"one-api/common"
 	"strconv"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Message struct {
 	Role    string  `json:"role"`

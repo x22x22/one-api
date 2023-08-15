@@ -3,7 +3,9 @@ package controller
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
+	"compress/flate"
+	"compress/gzip"
+	"github.com/andybalholm/brotli"
 	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
@@ -91,7 +93,29 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 func openaiHandler(c *gin.Context, resp *http.Response, consumeQuota bool, promptTokens int, model string) (*OpenAIErrorWithStatusCode, *Usage) {
 	var textResponse TextResponse
 	if consumeQuota {
-		responseBody, err := io.ReadAll(resp.Body)
+		var responseBody []byte
+		var responseBodyCopy []byte
+		var err error
+		responseBodyCopy, _ = io.ReadAll(resp.Body)
+		if resp.Uncompressed {
+			responseBody, err = io.ReadAll(bytes.NewBuffer(responseBodyCopy))
+		} else {
+			switch resp.Header.Get("Content-Encoding") {
+			case "br":
+				br := brotli.NewReader(bytes.NewBuffer(responseBodyCopy))
+				responseBody, err = io.ReadAll(br)
+			case "gzip":
+				gr, _ := gzip.NewReader(bytes.NewBuffer(responseBodyCopy))
+				defer gr.Close()
+				responseBody, err = io.ReadAll(gr)
+			case "deflate":
+				zr := flate.NewReader(bytes.NewBuffer(responseBodyCopy))
+				defer zr.Close()
+				responseBody, err = io.ReadAll(zr)
+			default:
+				responseBody, err = io.ReadAll(bytes.NewBuffer(responseBodyCopy))
+			}
+		}
 		if err != nil {
 			return errorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
 		}
@@ -110,7 +134,7 @@ func openaiHandler(c *gin.Context, resp *http.Response, consumeQuota bool, promp
 			}, nil
 		}
 		// Reset response body
-		resp.Body = io.NopCloser(bytes.NewBuffer(responseBody))
+		resp.Body = io.NopCloser(bytes.NewBuffer(responseBodyCopy))
 	}
 	// We shouldn't set the header before we parse the response body, because the parse part may fail.
 	// And then we will have to send an error response, but in this case, the header has already been set.

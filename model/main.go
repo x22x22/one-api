@@ -1,6 +1,7 @@
 package model
 
 import (
+	jsoniter "github.com/json-iterator/go"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -11,6 +12,7 @@ import (
 	"time"
 )
 
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var DB *gorm.DB
 
 func createRootAccountIfNeed() error {

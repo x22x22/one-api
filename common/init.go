@@ -3,6 +3,7 @@ package common
 import (
 	"flag"
 	"fmt"
+	jsoniter "github.com/json-iterator/go"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ var (
 	PrintVersion = flag.Bool("version", false, "print version and exit")
 	PrintHelp    = flag.Bool("help", false, "print help and exit")
 	LogDir       = flag.String("log-dir", "", "specify the log directory")
+	json         = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 func printHelp() {

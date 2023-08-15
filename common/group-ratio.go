@@ -1,7 +1,5 @@
 package common
 
-import "encoding/json"
-
 var GroupRatio = map[string]float64{
 	"default": 1,
 	"vip":     1,

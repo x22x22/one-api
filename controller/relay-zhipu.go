@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bufio"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"io"

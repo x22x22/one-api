@@ -1,7 +1,5 @@
 package common
 
-import "encoding/json"
-
 // ModelRatio
 // https://platform.openai.com/docs/models/model-endpoint-compatibility
 // https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Blfmc9dlf

@@ -1,13 +1,15 @@
 package middleware
 
 import (
-	"encoding/json"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	jsoniter "github.com/json-iterator/go"
 	"net/http"
 	"net/url"
 	"one-api/common"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type turnstileCheckResponse struct {
 	Success bool `json:"success"`

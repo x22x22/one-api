@@ -1,8 +1,13 @@
 package controller
 
 import (
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"fmt"
+	"github.com/andybalholm/brotli"
 	jsoniter "github.com/json-iterator/go"
+	"io"
 	"net/http"
 	"one-api/common"
 	"strconv"
@@ -218,4 +223,31 @@ func RelayNotFound(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{
 		"error": err,
 	})
+}
+
+// Uncompressed
+func UnCompressResp(resp *http.Response) ([]byte, []byte, error) {
+	var CompressedResp []byte
+	var responseBody []byte
+	var err error
+	CompressedResp, _ = io.ReadAll(resp.Body)
+	switch resp.Header.Get("Content-Encoding") {
+	case "br":
+		br := brotli.NewReader(bytes.NewBuffer(CompressedResp))
+		responseBody, err = io.ReadAll(br)
+	case "gzip":
+		gr, _ := gzip.NewReader(bytes.NewBuffer(CompressedResp))
+		defer gr.Close()
+		responseBody, err = io.ReadAll(gr)
+	case "deflate":
+		zr := flate.NewReader(bytes.NewBuffer(CompressedResp))
+		defer zr.Close()
+		responseBody, err = io.ReadAll(zr)
+	default:
+		responseBody, err = io.ReadAll(bytes.NewBuffer(CompressedResp))
+	}
+	if err != nil {
+		return nil, CompressedResp, err
+	}
+	return responseBody, CompressedResp, nil
 }

@@ -239,7 +239,7 @@ func baiduStreamHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorWithSt
 
 func baiduHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorWithStatusCode, *Usage) {
 	var baiduResponse BaiduChatResponse
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, _, err := UnCompressResp(resp)
 	if err != nil {
 		return errorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
 	}

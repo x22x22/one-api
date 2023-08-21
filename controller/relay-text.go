@@ -338,6 +338,11 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
 		}
 		isStream = isStream || strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
+
+		if resp.StatusCode != http.StatusOK {
+			return errorWrapper(
+				fmt.Errorf("bad status code: %d", resp.StatusCode), "bad_status_code", resp.StatusCode)
+		}
 	}
 
 	var textResponse TextResponse
@@ -349,14 +354,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		go func() {
 			if consumeQuota {
 				quota := 0
-				completionRatio := 1.0
-				if strings.HasPrefix(textRequest.Model, "gpt-3.5") {
-					completionRatio = 1.333333
-				}
-				if strings.HasPrefix(textRequest.Model, "gpt-4") {
-					completionRatio = 2
-				}
-
+				completionRatio := common.GetCompletionRatio(textRequest.Model)
 				promptTokens = textResponse.Usage.PromptTokens
 				completionTokens = textResponse.Usage.CompletionTokens
 

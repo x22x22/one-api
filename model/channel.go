@@ -67,7 +67,7 @@ func GetRandomChannel() (*Channel, error) {
 
 func BatchInsertChannels(channels []Channel) error {
 	var err error
-	err = DB.Create(&channels).Error
+	err = DB.CreateInBatches(&channels, 20).Error
 	if err != nil {
 		return err
 	}

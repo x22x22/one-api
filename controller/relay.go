@@ -175,6 +175,22 @@ func Relay(c *gin.Context) {
 		err = relayTextHelper(c, relayMode)
 	}
 	if err != nil {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					//ignore
+				}
+			}()
+			channelId := c.GetInt("channel_id")
+			common.SysError(fmt.Sprintf("relay error (channel #%d): %s", channelId, err.Message))
+			// https://platform.openai.com/docs/guides/error-codes/api-errors
+			if shouldDisableChannel(&err.OpenAIError) {
+				channelId := c.GetInt("channel_id")
+				channelName := c.GetString("channel_name")
+				disableChannel(channelId, channelName, err.Message)
+			}
+		}()
+
 		retryTimesStr := c.Query("retry")
 		retryTimes, _ := strconv.Atoi(retryTimesStr)
 		if retryTimesStr == "" {
@@ -189,14 +205,6 @@ func Relay(c *gin.Context) {
 			c.JSON(err.StatusCode, gin.H{
 				"error": err.OpenAIError,
 			})
-		}
-		channelId := c.GetInt("channel_id")
-		common.SysError(fmt.Sprintf("relay error (channel #%d): %s", channelId, err.Message))
-		// https://platform.openai.com/docs/guides/error-codes/api-errors
-		if shouldDisableChannel(&err.OpenAIError) {
-			channelId := c.GetInt("channel_id")
-			channelName := c.GetString("channel_name")
-			disableChannel(channelId, channelName, err.Message)
 		}
 	}
 }

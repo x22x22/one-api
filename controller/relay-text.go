@@ -340,8 +340,16 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		isStream = isStream || strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
 
 		if resp.StatusCode != http.StatusOK {
-			return errorWrapper(
-				fmt.Errorf("bad status code: %d", resp.StatusCode), "bad_status_code", resp.StatusCode)
+			var response TextResponse
+			err = json.NewDecoder(resp.Body).Decode(&response)
+			if err != nil || response.Error.Code == "" {
+				return errorWrapper(
+					fmt.Errorf("bad status code: %d", resp.StatusCode), "bad_status_code", resp.StatusCode)
+			}
+			return &OpenAIErrorWithStatusCode{
+				OpenAIError: response.Error,
+				StatusCode:  resp.StatusCode,
+			}
 		}
 	}
 

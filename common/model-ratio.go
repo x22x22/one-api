@@ -1,6 +1,7 @@
 package common
 
 import "strings"
+
 // ModelRatio
 // https://platform.openai.com/docs/models/model-endpoint-compatibility
 // https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Blfmc9dlf
@@ -68,7 +69,7 @@ func GetModelRatio(name string) float64 {
 	ratio, ok := ModelRatio[name]
 	if !ok {
 		SysError("model ratio not found: " + name)
-		return 30
+		return 1
 	}
 	return ratio
 }

@@ -39,7 +39,7 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 			}
 			dataChan <- string(event.Data)
 			data = strings.TrimPrefix(string(event.Data), " ")
-			if !strings.HasPrefix(data, "[DONE]") {
+			if !strings.HasPrefix(data, "[DONE]") && len(data) > 1 {
 				switch relayMode {
 				case RelayModeChatCompletions:
 					var streamResponse ChatCompletionsStreamResponse

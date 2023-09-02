@@ -291,6 +291,10 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 				req.Header.Set("api-key", apiKey)
 			} else {
 				req.Header.Set("Authorization", c.Request.Header.Get("Authorization"))
+				if channelType == common.ChannelTypeOpenRouter {
+					req.Header.Set("HTTP-Referer", "https://github.com/songquanpeng/one-api")
+					req.Header.Set("X-Title", "One API")
+				}
 			}
 		case APITypeClaude:
 			req.Header.Set("x-api-key", apiKey)
@@ -314,8 +318,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 		req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 		//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
-		req.Header.Set("HTTP-Referer", "https://one.eqing.tech")
-		req.Header.Set("X-Title", "one-api")
+
 		asyncNum := c.GetInt("async_num")
 		if asyncNum <= 1 {
 			resp, err = httpClient.Do(req)
@@ -340,16 +343,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		isStream = isStream || strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
 
 		if resp.StatusCode != http.StatusOK {
-			var response TextResponse
-			err = json.NewDecoder(resp.Body).Decode(&response)
-			if err != nil || response.Error.Code == "" {
-				return errorWrapper(
-					fmt.Errorf("bad status code: %d", resp.StatusCode), "bad_status_code", resp.StatusCode)
-			}
-			return &OpenAIErrorWithStatusCode{
-				OpenAIError: response.Error,
-				StatusCode:  resp.StatusCode,
-			}
+			return relayErrorHandler(resp)
 		}
 	}
 

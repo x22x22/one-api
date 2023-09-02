@@ -32,6 +32,7 @@ const (
 	RelayModeModerations
 	RelayModeImagesGenerations
 	RelayModeEdits
+	RelayModeAudio
 )
 
 // https://platform.openai.com/docs/api-reference/chat
@@ -48,6 +49,7 @@ type GeneralOpenAIRequest struct {
 	Input       any       `json:"input,omitempty"`
 	Instruction string    `json:"instruction,omitempty"`
 	Size        string    `json:"size,omitempty"`
+	Functions   any       `json:"functions,omitempty"`
 }
 
 type ChatRequest struct {
@@ -68,6 +70,10 @@ type ImageRequest struct {
 	Prompt string `json:"prompt"`
 	N      int    `json:"n"`
 	Size   string `json:"size"`
+}
+
+type AudioResponse struct {
+	Text string `json:"text,omitempty"`
 }
 
 type Usage struct {
@@ -166,11 +172,15 @@ func Relay(c *gin.Context) {
 		relayMode = RelayModeImagesGenerations
 	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/edits") {
 		relayMode = RelayModeEdits
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/audio") {
+		relayMode = RelayModeAudio
 	}
 	var err *OpenAIErrorWithStatusCode
 	switch relayMode {
 	case RelayModeImagesGenerations:
 		err = relayImageHelper(c, relayMode)
+	case RelayModeAudio:
+		err = relayAudioHelper(c, relayMode)
 	default:
 		err = relayTextHelper(c, relayMode)
 	}
@@ -205,6 +215,14 @@ func Relay(c *gin.Context) {
 			c.JSON(err.StatusCode, gin.H{
 				"error": err.OpenAIError,
 			})
+		}
+		channelId := c.GetInt("channel_id")
+		common.SysError(fmt.Sprintf("relay error (channel #%d): %s", channelId, err.Message))
+		// https://platform.openai.com/docs/guides/error-codes/api-errors
+		if shouldDisableChannel(&err.OpenAIError, err.StatusCode) {
+			channelId := c.GetInt("channel_id")
+			channelName := c.GetString("channel_name")
+			disableChannel(channelId, channelName, err.Message)
 		}
 	}
 }

@@ -71,7 +71,8 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 	c.Stream(func(w io.Writer) bool {
 		select {
 		case data := <-dataChan:
-			c.SSEvent("", data)
+			data = strings.TrimSuffix(data, "\r")
+			c.Render(-1, common.CustomEvent{Data: "data: " + data})
 			return true
 		case <-stopChan:
 			return false

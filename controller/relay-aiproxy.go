@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"

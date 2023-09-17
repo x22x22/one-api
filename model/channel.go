@@ -24,6 +24,7 @@ type Channel struct {
 	Group              string  `json:"group" gorm:"type:varchar(32);default:'default'"`
 	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
 	ModelMapping       string  `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
+	Priority           int64   `json:"priority" gorm:"bigint;default:0"`
 	AsyncNum           int     `json:"async_num" gorm:"column:async_num;default:1"`
 }
 

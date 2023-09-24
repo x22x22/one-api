@@ -15,17 +15,17 @@ type Channel struct {
 	CreatedTime        int64   `json:"created_time" gorm:"bigint"`
 	TestTime           int64   `json:"test_time" gorm:"bigint"`
 	ResponseTime       int     `json:"response_time"` // in milliseconds
-	BaseURL            string  `json:"base_url" gorm:"column:base_url"`
 	FullURL            string  `json:"full_url" gorm:"column:full_url;default:''"`
+	BaseURL            *string `json:"base_url" gorm:"column:base_url;default:''"`
 	Other              string  `json:"other"`
 	Balance            float64 `json:"balance"` // in USD
 	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`
 	Models             string  `json:"models"`
 	Group              string  `json:"group" gorm:"type:varchar(32);default:'default'"`
 	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
-	ModelMapping       string  `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
-	Priority           int64   `json:"priority" gorm:"bigint;default:0"`
 	AsyncNum           int     `json:"async_num" gorm:"column:async_num;default:1"`
+	ModelMapping       *string `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
+	Priority           *int64  `json:"priority" gorm:"bigint;default:0"`
 }
 
 func GetAllChannels(startIdx int, num int, selectAll bool) ([]*Channel, error) {
@@ -79,6 +79,27 @@ func BatchInsertChannels(channels []Channel) error {
 		}
 	}
 	return nil
+}
+
+func (channel *Channel) GetPriority() int64 {
+	if channel.Priority == nil {
+		return 0
+	}
+	return *channel.Priority
+}
+
+func (channel *Channel) GetBaseURL() string {
+	if channel.BaseURL == nil {
+		return ""
+	}
+	return *channel.BaseURL
+}
+
+func (channel *Channel) GetModelMapping() string {
+	if channel.ModelMapping == nil {
+		return ""
+	}
+	return *channel.ModelMapping
 }
 
 func (channel *Channel) Insert() error {

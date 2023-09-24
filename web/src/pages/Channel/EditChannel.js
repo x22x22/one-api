@@ -67,7 +67,7 @@ const EditChannel = () => {
           localModels = ['ERNIE-Bot', 'ERNIE-Bot-turbo', 'Embedding-V1'];
           break;
         case 17:
-          localModels = ['qwen-v1', 'qwen-plus-v1', 'text-embedding-v1'];
+          localModels = ['qwen-turbo', 'qwen-plus', 'text-embedding-v1'];
           break;
         case 16:
           localModels = ['chatglm_pro', 'chatglm_std', 'chatglm_lite'];
@@ -174,7 +174,7 @@ const EditChannel = () => {
       return;
     }
     let localInputs = inputs;
-    if (localInputs.base_url.endsWith('/')) {
+    if (localInputs.base_url && localInputs.base_url.endsWith('/')) {
       localInputs.base_url = localInputs.base_url.slice(0, localInputs.base_url.length - 1);
     }
     if (localInputs.type === 3 && localInputs.other === '') {
@@ -182,9 +182,6 @@ const EditChannel = () => {
     }
     if (localInputs.type === 18 && localInputs.other === '') {
       localInputs.other = 'v2.1';
-    }
-    if (localInputs.model_mapping === '') {
-      localInputs.model_mapping = '{}';
     }
     let res;
     localInputs.models = localInputs.models.join(',');

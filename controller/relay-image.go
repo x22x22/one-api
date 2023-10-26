@@ -5,12 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
@@ -60,16 +59,12 @@ func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 			isModelMapped = true
 		}
 	}
-
 	baseURL := common.ChannelBaseURLs[channelType]
 	requestURL := c.Request.URL.String()
-
 	if c.GetString("base_url") != "" {
 		baseURL = c.GetString("base_url")
 	}
-
-	fullRequestURL := fmt.Sprintf("%s%s", baseURL, requestURL)
-
+	fullRequestURL := getFullRequestURL(baseURL, requestURL, channelType)
 	var requestBody io.Reader
 	if isModelMapped {
 		jsonStr, err := json.Marshal(imageRequest)

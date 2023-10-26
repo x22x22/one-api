@@ -5,12 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 func relayAudioHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
@@ -65,12 +64,11 @@ func relayAudioHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 
 	baseURL := common.ChannelBaseURLs[channelType]
 	requestURL := c.Request.URL.String()
-
 	if c.GetString("base_url") != "" {
 		baseURL = c.GetString("base_url")
 	}
 
-	fullRequestURL := fmt.Sprintf("%s%s", baseURL, requestURL)
+	fullRequestURL := getFullRequestURL(baseURL, requestURL, channelType)
 	requestBody := c.Request.Body
 
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)

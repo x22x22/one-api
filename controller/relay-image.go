@@ -35,7 +35,7 @@ func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 	}
 
 	// Model validation
-	if imageRequest.Model != "" || imageRequest.Model != "dall-e-3" {
+	if imageRequest.Model != "dall-e-3" {
 		imageModel = "dall-e-2"
 	}
 

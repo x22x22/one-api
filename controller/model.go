@@ -145,21 +145,12 @@ func init() {
 			Parent:     nil,
 		},
 		{
-			Id:         "gpt-3.5-turbo-instruct-0914	",
+			Id:         "gpt-3.5-turbo-instruct-0914",
 			Object:     "model",
 			Created:    1677649963,
 			OwnedBy:    "openai",
 			Permission: permission,
-			Root:       "gpt-3.5-turbo-instruct-0914	",
-			Parent:     nil,
-		},
-		{
-			Id:         "gpt-3.5-turbo-1106",
-			Object:     "model",
-			Created:    1677649963,
-			OwnedBy:    "openai",
-			Permission: permission,
-			Root:       "gpt-3.5-turbo-1106",
+			Root:       "gpt-3.5-turbo-instruct-0914",
 			Parent:     nil,
 		},
 		{

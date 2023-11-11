@@ -4,7 +4,7 @@ WORKDIR /app
 COPY . .
 RUN chmod +x ./translate-en.sh && ./translate-en.sh
 
-FROM node:18 as builder
+FROM node:20 as builder
 
 WORKDIR /build
 COPY ./web/package*.json ./

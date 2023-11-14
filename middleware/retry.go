@@ -12,8 +12,6 @@ import (
 )
 
 func Retry(group *gin.RouterGroup) gin.HandlerFunc {
-	filteredHandlers := make(gin.HandlersChain, 0)
-
 	var retryMiddleware gin.HandlerFunc
 	retryMiddleware = func(c *gin.Context) {
 		// backup request header and body
@@ -28,7 +26,7 @@ func Retry(group *gin.RouterGroup) gin.HandlerFunc {
 
 		// 获取Retry后续的中间件
 		found := false
-		filteredHandlers = filteredHandlers[:0]
+		filteredHandlers := make(gin.HandlersChain, 0)
 		for _, handler := range group.Handlers {
 			if reflect.ValueOf(handler).Pointer() == reflect.ValueOf(retryMiddleware).Pointer() {
 				found = true

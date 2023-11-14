@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"github.com/andybalholm/brotli"
 	jsoniter "github.com/json-iterator/go"
 	"io"
 	"net/http"
 	"one-api/common"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -221,13 +221,14 @@ func Relay(c *gin.Context) {
 			}
 		}()
 
-		retryTimesStr := c.Query("retry")
-		retryTimes, _ := strconv.Atoi(retryTimesStr)
-		if retryTimesStr == "" {
-			retryTimes = common.RetryTimes
-		}
+		retryTimes := c.GetInt("retry")
 		if retryTimes > 0 {
-			c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s?retry=%d", c.Request.URL.Path, retryTimes-1))
+			openaiErr, err := json.Marshal(err.OpenAIError)
+			if err != nil {
+				return
+			}
+			_ = c.Error(errors.New(string(openaiErr)))
+			return
 		} else {
 			if err.StatusCode == http.StatusTooManyRequests {
 				err.OpenAIError.Message = "当前分组上游负载已饱和，请稍后再试"

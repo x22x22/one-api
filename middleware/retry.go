@@ -6,70 +6,75 @@ import (
 	"io"
 	"net/http"
 	"one-api/common"
-	"reflect"
 	"strconv"
 	"time"
 )
 
-func Retry(group *gin.RouterGroup) gin.HandlerFunc {
-	var retryMiddleware gin.HandlerFunc
-	retryMiddleware = func(c *gin.Context) {
-		// backup request header and body
-		backupReqHeader := c.Request.Header.Clone()
-		backupReqBody, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			abortWithMessage(c, http.StatusBadRequest, "无效的请求")
-			return
+func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
+	var retryHandler gin.HandlerFunc
+	// 获取RetryHandler在当前HandlersChain的位置
+	index := len(group.Handlers) + 1
+	retryHandler = func(c *gin.Context) {
+		// Backup request
+		hasBody := c.Request.ContentLength > 0
+		backupHeader := c.Request.Header.Clone()
+		var backupBody []byte
+		var err error
+		if hasBody {
+			backupBody, err = io.ReadAll(c.Request.Body)
+			if err != nil {
+				abortWithMessage(c, http.StatusBadRequest, "Invalid request")
+				return
+			}
+			_ = c.Request.Body.Close()
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(backupBody))
 		}
-		_ = c.Request.Body.Close()
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(backupReqBody))
 
-		// 获取Retry Middleware后续的中间件
-		found := false
-		filteredHandlers := make(gin.HandlersChain, 0)
-		for _, handler := range group.Handlers {
-			if reflect.ValueOf(handler).Pointer() == reflect.ValueOf(retryMiddleware).Pointer() {
-				found = true
-				continue
-			}
-			if found {
-				filteredHandlers = append(filteredHandlers, handler)
-			}
-		}
+		// 获取 retryHandler 后续的中间件
+		// Get next handlers
+		nextHandlers := group.Handlers[index:]
+
 		// 加入Relay处理函数 c.Handler() => c.handlers.Last() => controller.Relay
-		filteredHandlers = append(filteredHandlers, c.Handler())
+		// Add Relay handler
+		nextHandlers = append(nextHandlers, c.Handler())
 
-		// retry
+		// Retry
 		maxRetryStr := c.Query("retry")
 		maxRetry, err := strconv.Atoi(maxRetryStr)
 		if err != nil || maxRetryStr == "" || maxRetry < 0 || maxRetry > common.RetryTimes {
 			maxRetry = common.RetryTimes
 		}
-		retryInterval := time.Duration(common.RetryInterval) * time.Millisecond
+		retryDelay := time.Duration(common.RetryInterval) * time.Millisecond
 		for i := maxRetry; i >= 0; i-- {
 			c.Set("retry", i)
 
 			if i == maxRetry {
-				// 第一次请求, 直接执行后续中间件
+				// 第一次请求, 直接执行使用c.Next()调用后续中间件, 防止直接使用handler 内部调用c.Next() 导致重复执行
+				// First request, execute next middleware
 				c.Next()
 			} else {
 				// 重试, 恢复请求头和请求体, 并执行后续中间件
-				c.Request.Header = backupReqHeader.Clone()
-				c.Request.Body = io.NopCloser(bytes.NewBuffer(backupReqBody))
-				for _, handler := range filteredHandlers {
+				// Retry, restore request and execute next middleware
+				c.Request.Header = backupHeader.Clone()
+				if hasBody {
+					c.Request.Body = io.NopCloser(bytes.NewBuffer(backupBody))
+				}
+				for _, handler := range nextHandlers {
 					handler(c)
 				}
 			}
-			// 无错误, 直接返回
+
+			// If no errors, return
 			if len(c.Errors) == 0 {
 				return
 			}
-
-			// 如果有错误，等待一段时间后重试
-			time.Sleep(retryInterval)
-			// 清理错误列表，以避免后续中间件误解这个错误
+			// c.index 指向 AbortIndex 可以防止出错时重复执行后续中间件
+			c.Abort()
+			// If errors, retry after delay
+			time.Sleep(retryDelay)
+			// Clear errors to avoid confusion in next middleware
 			c.Errors = c.Errors[:0]
 		}
 	}
-	return retryMiddleware
+	return retryHandler
 }

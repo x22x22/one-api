@@ -14,9 +14,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func isWithinRange(element string, value int) bool {
+	if _, ok := common.DalleGenerationImageAmounts[element]; !ok {
+		return false
+	}
+
+	min := common.DalleGenerationImageAmounts[element][0]
+	max := common.DalleGenerationImageAmounts[element][1]
+
+	return value >= min && value <= max
+}
+
 func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	imageModel := "dall-e-2"
-	requestSize := "1024x1024"
+	imageSize := "1024x1024"
 
 	tokenId := c.GetInt("token_id")
 	channelType := c.GetInt("channel")
@@ -34,19 +45,44 @@ func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 		}
 	}
 
-	// Model validation
-	if imageRequest.Model != "dall-e-3" {
-		imageModel = "dall-e-2"
-	}
-
 	// Size validation
 	if imageRequest.Size != "" {
-		requestSize = imageRequest.Size
+		imageSize = imageRequest.Size
+	}
+
+	// Model validation
+	if imageRequest.Model != "" {
+		imageModel = imageRequest.Model
+	}
+
+	imageCostRatio, hasValidSize := common.DalleSizeRatios[imageModel][imageSize]
+
+	// Check if model is supported
+	if hasValidSize {
+		if imageRequest.Quality == "hd" && imageModel == "dall-e-3" {
+			if imageSize == "1024x1024" {
+				imageCostRatio *= 2
+			} else {
+				imageCostRatio *= 1.5
+			}
+		}
+	} else {
+		return errorWrapper(errors.New("size not supported for this image model"), "size_not_supported", http.StatusBadRequest)
 	}
 
 	// Prompt validation
 	if imageRequest.Prompt == "" {
-		return errorWrapper(errors.New("prompt is required"), "required_field_missing", http.StatusBadRequest)
+		return errorWrapper(errors.New("prompt is required"), "prompt_missing", http.StatusBadRequest)
+	}
+
+	// Check prompt length
+	if len(imageRequest.Prompt) > common.DalleImagePromptLengthLimitations[imageModel] {
+		return errorWrapper(errors.New("prompt is too long"), "prompt_too_long", http.StatusBadRequest)
+	}
+
+	// Number of generated images validation
+	if isWithinRange(imageModel, imageRequest.N) == false {
+		return errorWrapper(errors.New("invalud value of n"), "n_not_within_range", http.StatusBadRequest)
 	}
 
 	// map model name
@@ -89,19 +125,7 @@ func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 		return errorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
 	}
 
-	sizeRatio := 1.0
-
-	if ratios, ok := common.DalleSizeRatios[imageModel]; ok {
-		if ratio, ok := ratios[requestSize]; ok {
-			sizeRatio = ratio
-
-			if imageRequest.Quality == "hd" {
-				sizeRatio = ratio * 2
-			}
-		}
-	}
-
-	quota := int(ratio*sizeRatio*1000) * imageRequest.N
+	quota := int(ratio*imageCostRatio*1000) * imageRequest.N
 
 	if consumeQuota && userQuota-quota < 0 {
 		return errorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusForbidden)

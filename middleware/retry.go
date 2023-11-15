@@ -15,16 +15,16 @@ func Retry(group *gin.RouterGroup) gin.HandlerFunc {
 	var retryMiddleware gin.HandlerFunc
 	retryMiddleware = func(c *gin.Context) {
 		// backup request header and body
-		backReqHeader := c.Request.Header.Clone()
-		requestBody, err := io.ReadAll(c.Request.Body)
+		backupReqHeader := c.Request.Header.Clone()
+		backupReqBody, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			abortWithMessage(c, http.StatusBadRequest, "无效的请求")
 			return
 		}
 		_ = c.Request.Body.Close()
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(backupReqBody))
 
-		// 获取Retry后续的中间件
+		// 获取Retry Middleware后续的中间件
 		found := false
 		filteredHandlers := make(gin.HandlersChain, 0)
 		for _, handler := range group.Handlers {
@@ -36,6 +36,7 @@ func Retry(group *gin.RouterGroup) gin.HandlerFunc {
 				filteredHandlers = append(filteredHandlers, handler)
 			}
 		}
+		// 加入Relay处理函数 c.Handler() => c.handlers.Last() => controller.Relay
 		filteredHandlers = append(filteredHandlers, c.Handler())
 
 		// retry
@@ -53,8 +54,8 @@ func Retry(group *gin.RouterGroup) gin.HandlerFunc {
 				c.Next()
 			} else {
 				// 重试, 恢复请求头和请求体, 并执行后续中间件
-				c.Request.Header = backReqHeader.Clone()
-				c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+				c.Request.Header = backupReqHeader.Clone()
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(backupReqBody))
 				for _, handler := range filteredHandlers {
 					handler(c)
 				}

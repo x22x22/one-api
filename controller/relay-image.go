@@ -81,7 +81,7 @@ func relayImageHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 	}
 
 	// Number of generated images validation
-	if isWithinRange(imageModel, imageRequest.N) == false {
+	if !isWithinRange(imageModel, imageRequest.N) {
 		return errorWrapper(errors.New("invalud value of n"), "n_not_within_range", http.StatusBadRequest)
 	}
 

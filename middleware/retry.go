@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+type OpenAIErrorWithStatusCode struct {
+	OpenAIError
+	StatusCode int `json:"status_code"`
+}
+
+type OpenAIError struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Param   string `json:"param"`
+	Code    any    `json:"code"`
+}
+
 func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
 	var retryHandler gin.HandlerFunc
 	// 获取RetryHandler在当前HandlersChain的位置
@@ -45,14 +57,14 @@ func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
 			maxRetry = common.RetryTimes
 		}
 		retryDelay := time.Duration(common.RetryInterval) * time.Millisecond
-		for i := maxRetry; i >= 0; i-- {
-			c.Set("retry", i)
-
-			if i == maxRetry {
+		for i := 0; i < maxRetry; i++ {
+			if i == 0 {
 				// 第一次请求, 直接执行使用c.Next()调用后续中间件, 防止直接使用handler 内部调用c.Next() 导致重复执行
 				// First request, execute next middleware
 				c.Next()
 			} else {
+				// Clear errors to avoid confusion in next middleware
+				c.Errors = c.Errors[:0]
 				// 重试, 恢复请求头和请求体, 并执行后续中间件
 				// Retry, restore request and execute next middleware
 				c.Request.Header = backupHeader.Clone()
@@ -72,9 +84,12 @@ func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
 			c.Abort()
 			// If errors, retry after delay
 			time.Sleep(retryDelay)
-			// Clear errors to avoid confusion in next middleware
-			c.Errors = c.Errors[:0]
 		}
+		var openaiErr *OpenAIErrorWithStatusCode
+		_ = json.Unmarshal([]byte(c.Errors.Last().Error()), &openaiErr)
+		c.JSON(openaiErr.StatusCode, gin.H{
+			"error": openaiErr.OpenAIError,
+		})
 	}
 	return retryHandler
 }

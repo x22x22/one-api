@@ -221,23 +221,13 @@ func Relay(c *gin.Context) {
 			}
 		}()
 
-		retryTimes := c.GetInt("retry")
-		if retryTimes > 0 {
-			openaiErr, err := json.Marshal(err.OpenAIError)
-			if err != nil {
-				return
-			}
-			_ = c.Error(errors.New(string(openaiErr)))
-			return
-		} else {
-			if err.StatusCode == http.StatusTooManyRequests {
-				err.OpenAIError.Message = "当前分组上游负载已饱和，请稍后再试"
-			}
-			err.OpenAIError.Message = common.MessageWithRequestId(err.OpenAIError.Message, requestId)
-			c.JSON(err.StatusCode, gin.H{
-				"error": err.OpenAIError,
-			})
+		if err.StatusCode == http.StatusTooManyRequests {
+			err.OpenAIError.Message = "当前分组上游负载已饱和，请稍后再试"
 		}
+		err.OpenAIError.Message = common.MessageWithRequestId(err.OpenAIError.Message, requestId)
+		openaiErr, _ := json.Marshal(err)
+		_ = c.Error(errors.New(string(openaiErr)))
+		return
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"one-api/common"
 	"one-api/model"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,7 @@ const (
 )
 
 var httpClient *http.Client
+var timeoutHTTPClient *http.Client
 var impatientHTTPClient *http.Client
 
 func init() {
@@ -47,6 +49,13 @@ func init() {
 			},
 			Timeout: time.Duration(common.RelayTimeout) * time.Second,
 		}
+	}
+	timeoutHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+			IdleConnTimeout:       time.Second * 15,
+			ResponseHeaderTimeout: time.Second * 15,
+		},
 	}
 
 	impatientHTTPClient = &http.Client{
@@ -398,14 +407,14 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
 
 		asyncNum := c.GetInt("async_num")
-		if asyncNum <= 1 {
-			resp, err = httpClient.Do(req)
-		} else {
-			requests := make([]*http.Request, asyncNum)
+		requests := make([]*http.Request, asyncNum)
+		if isStream {
 			for i := 0; i < asyncNum; i++ {
-				requests[i] = req.Clone(context.Background())
+				requests[i] = req.Clone(c.Request.Context())
 			}
 			resp, err = asyncHTTPDo(requests)
+		} else {
+			resp, err = httpClient.Do(req)
 		}
 		if err != nil {
 			return errorWrapper(err, "do_request_failed", http.StatusInternalServerError)
@@ -675,57 +684,63 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 }
 
 func asyncHTTPDo(reqs []*http.Request) (*http.Response, error) {
-	tmpReq := reqs[0].Clone(context.Background())
-	ch := make(chan *http.Response)
-	var anySuccess bool
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	respCh := make(chan *http.Response)
+	errCh := make(chan error)
+	wg := &sync.WaitGroup{}
+	cancelFuncs := make(map[int]context.CancelFunc)
 
-	reqCh := make(chan *http.Request)
-	defer close(reqCh)
+	for i, req := range reqs {
+		wg.Add(1)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancelFuncs[i] = cancel
+		go func(i int, req *http.Request, cancel context.CancelFunc) {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Println("Recovered from panic:", r)
+				}
+			}()
+			req = req.WithContext(ctx)
+			resp, err := timeoutHTTPClient.Do(req)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			_ = req.Body.Close()
+			if resp.StatusCode == 200 {
+				delete(cancelFuncs, i) // remove the cancel function of the successful request
+				respCh <- resp
+				return
+			}
+			_ = resp.Body.Close()
+			errCh <- errors.New("Non-200 status code")
+		}(i, req, cancel)
+	}
 
 	go func() {
-		for req := range reqCh {
-			go func(req *http.Request) {
-				defer func() {
-					if r := recover(); r != nil {
-					}
-				}()
-				req.WithContext(ctx)
-				resp, err := httpClient.Do(req)
-				if err != nil {
-					return
-				}
-				if resp.StatusCode == 200 {
-					ch <- resp
-				}
-			}(req)
-		}
+		wg.Wait()
+		close(respCh)
+		close(errCh)
 	}()
-
-	for _, req := range reqs {
-		reqCh <- req
-	}
-	addTime := time.After(5 * time.Second)
-	// 设置一个定时器，如果超过一定时间没有任何响应，就返回 nil
-	timeout := time.After(15 * time.Second)
 
 	for {
 		select {
-		case <-addTime:
-			reqCh <- tmpReq
-		case resp := <-ch:
-			// 如果接收到一个回应，那么取消其余请求并回应
-			anySuccess = true
-			cancel()
-			return resp, nil
-
-		case <-timeout:
-			// 如果超时，确保所有的 goroutine 都被 cancel 并返回 nil
-			if !anySuccess {
-				cancel()
-				return nil, fmt.Errorf("请求超时")
+		case resp, ok := <-respCh:
+			if ok {
+				for _, cancel := range cancelFuncs {
+					cancel()
+				}
+				return resp, nil
 			}
+		case err, ok := <-errCh:
+			if ok {
+				return nil, err
+			}
+		case <-time.After(15 * time.Second):
+			for _, cancel := range cancelFuncs {
+				cancel()
+			}
+			return nil, errors.New("All requests timed out")
 		}
 	}
 }

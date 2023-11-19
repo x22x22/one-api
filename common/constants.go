@@ -82,8 +82,8 @@ var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 var ApproximateTokenEnabled = false
 var RetryTimes = 0
-
-var RetryInterval = 0 // unit is millisecond
+var RelayResponseTimeout = GetOrDefault("RELAY_RESPONSE_TIMEOUT", 15) // unit is second
+var RetryInterval = 0                                                 // unit is millisecond
 
 var RootUserEmail = ""
 

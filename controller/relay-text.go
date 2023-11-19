@@ -50,12 +50,14 @@ func init() {
 			Timeout: time.Duration(common.RelayTimeout) * time.Second,
 		}
 	}
-
+	timeout := common.RelayResponseTimeout
+	if timeout < 5 {
+		timeout = 5
+	}
 	timeoutHTTPClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-			IdleConnTimeout:       time.Second * 15,
-			ResponseHeaderTimeout: time.Second * 15,
+			ResponseHeaderTimeout: time.Second * time.Duration(timeout),
 		},
 	}
 
@@ -695,6 +697,7 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 			reqs[i] = req.Clone(req.Context())
 		}
 	}
+	timer := time.NewTimer(3 * time.Second)
 
 	var lastErr error
 
@@ -744,6 +747,7 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 		case resp, ok := <-respCh:
 			if ok {
 				if resp.StatusCode == 200 {
+					timer.Stop()
 					for _, cancel := range cancelFuncs {
 						cancel()
 					}
@@ -751,7 +755,26 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 				}
 				resps = append(resps, resp)
 			}
+		case <-timer.C:
+			if asyncNum > 1 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					defer func() {
+						if r := recover(); r != nil {
+							fmt.Println("Recovered from panic:", r)
+						}
+					}()
+					resp, err := timeoutHTTPClient.Do(req)
+					if err != nil {
+						lastErr = err
+						return
+					}
+					respCh <- resp
+				}()
+			}
 		case <-done:
+			timer.Stop()
 			for _, cancel := range cancelFuncs {
 				cancel()
 			}
@@ -761,11 +784,6 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 				resps = resps[1:]
 			}
 			return resp, lastErr
-		case <-time.After(15 * time.Second):
-			for _, cancel := range cancelFuncs {
-				cancel()
-			}
-			return nil, errors.New("All requests timed out")
 		}
 	}
 }

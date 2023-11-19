@@ -690,11 +690,20 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 	reqs := make([]*http.Request, asyncNum)
 	resps := make([]*http.Response, 0)
 	done := make(chan bool)
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
 	if asyncNum == 1 {
 		reqs[0] = req
+		reqs[0].Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		reqs[0].ContentLength = int64(len(bodyBytes))
 	} else {
 		for i := 0; i < asyncNum; i++ {
 			reqs[i] = req.Clone(req.Context())
+			// 在每个复制的请求中创建一个新的 bytes.Reader
+			reqs[i].Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			reqs[i].ContentLength = int64(len(bodyBytes))
 		}
 	}
 	timer := time.NewTimer(3 * time.Second)

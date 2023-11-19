@@ -50,6 +50,7 @@ func init() {
 			Timeout: time.Duration(common.RelayTimeout) * time.Second,
 		}
 	}
+
 	timeoutHTTPClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
@@ -687,8 +688,12 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 	reqs := make([]*http.Request, asyncNum)
 	resps := make([]*http.Response, 0)
 	done := make(chan bool)
-	for i := 0; i < asyncNum; i++ {
-		reqs[i] = req.Clone(req.Context())
+	if asyncNum == 1 {
+		reqs[0] = req
+	} else {
+		for i := 0; i < asyncNum; i++ {
+			reqs[i] = req.Clone(req.Context())
+		}
 	}
 
 	var lastErr error

@@ -85,7 +85,7 @@ func requestOpenAI2Tencent(request GeneralOpenAIRequest) *TencentChatRequest {
 		if message.Role == "system" {
 			messages = append(messages, TencentMessage{
 				Role:    "user",
-				Content: message.Content,
+				Content: message.StringContent(),
 			})
 			messages = append(messages, TencentMessage{
 				Role:    "assistant",
@@ -94,7 +94,7 @@ func requestOpenAI2Tencent(request GeneralOpenAIRequest) *TencentChatRequest {
 			continue
 		}
 		messages = append(messages, TencentMessage{
-			Content: message.Content,
+			Content: message.StringContent(),
 			Role:    message.Role,
 		})
 	}

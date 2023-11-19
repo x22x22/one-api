@@ -113,7 +113,7 @@ func requestOpenAI2Zhipu(request GeneralOpenAIRequest) *ZhipuRequest {
 		if message.Role == "system" {
 			messages = append(messages, ZhipuMessage{
 				Role:    "system",
-				Content: message.Content,
+				Content: message.StringContent(),
 			})
 			messages = append(messages, ZhipuMessage{
 				Role:    "user",
@@ -122,7 +122,7 @@ func requestOpenAI2Zhipu(request GeneralOpenAIRequest) *ZhipuRequest {
 		} else {
 			messages = append(messages, ZhipuMessage{
 				Role:    message.Role,
-				Content: message.Content,
+				Content: message.StringContent(),
 			})
 		}
 	}

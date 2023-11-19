@@ -88,7 +88,7 @@ func requestOpenAI2Baidu(request GeneralOpenAIRequest) *BaiduChatRequest {
 		if message.Role == "system" {
 			messages = append(messages, BaiduMessage{
 				Role:    "user",
-				Content: message.Content,
+				Content: message.StringContent(),
 			})
 			messages = append(messages, BaiduMessage{
 				Role:    "assistant",
@@ -97,7 +97,7 @@ func requestOpenAI2Baidu(request GeneralOpenAIRequest) *BaiduChatRequest {
 		} else {
 			messages = append(messages, BaiduMessage{
 				Role:    message.Role,
-				Content: message.Content,
+				Content: message.StringContent(),
 			})
 		}
 	}

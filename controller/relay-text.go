@@ -407,12 +407,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
 
 		asyncNum := c.GetInt("async_num")
-		requests := make([]*http.Request, asyncNum)
 		if isStream {
-			for i := 0; i < asyncNum; i++ {
-				requests[i] = req.Clone(c.Request.Context())
-			}
-			resp, err = asyncHTTPDo(requests)
+			resp, err = asyncHTTPDo(req, asyncNum)
 		} else {
 			resp, err = httpClient.Do(req)
 		}
@@ -683,11 +679,19 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 	}
 }
 
-func asyncHTTPDo(reqs []*http.Request) (*http.Response, error) {
+func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 	respCh := make(chan *http.Response)
 	errCh := make(chan error)
 	wg := &sync.WaitGroup{}
 	cancelFuncs := make(map[int]context.CancelFunc)
+	reqs := make([]*http.Request, asyncNum)
+	resps := make([]*http.Response, 0)
+	done := make(chan bool)
+	for i := 0; i < asyncNum; i++ {
+		reqs[i] = req.Clone(req.Context())
+	}
+
+	var lastErr error
 
 	for i, req := range reqs {
 		wg.Add(1)
@@ -701,41 +705,57 @@ func asyncHTTPDo(reqs []*http.Request) (*http.Response, error) {
 				}
 			}()
 			req = req.WithContext(ctx)
+			defer req.Body.Close()
 			resp, err := timeoutHTTPClient.Do(req)
 			if err != nil {
-				errCh <- err
+				lastErr = err
 				return
 			}
-			_ = req.Body.Close()
 			if resp.StatusCode == 200 {
 				delete(cancelFuncs, i) // remove the cancel function of the successful request
-				respCh <- resp
-				return
 			}
-			_ = resp.Body.Close()
-			errCh <- errors.New("Non-200 status code")
+			respCh <- resp
 		}(i, req, cancel)
 	}
 
 	go func() {
 		wg.Wait()
+		done <- true
 		close(respCh)
 		close(errCh)
+		close(done)
+	}()
+
+	defer func() {
+		for _, res := range resps {
+			if res != nil && res.Body != nil {
+				_ = res.Body.Close()
+			}
+		}
 	}()
 
 	for {
 		select {
 		case resp, ok := <-respCh:
 			if ok {
-				for _, cancel := range cancelFuncs {
-					cancel()
+				if resp.StatusCode == 200 {
+					for _, cancel := range cancelFuncs {
+						cancel()
+					}
+					return resp, nil
 				}
-				return resp, nil
+				resps = append(resps, resp)
 			}
-		case err, ok := <-errCh:
-			if ok {
-				return nil, err
+		case <-done:
+			for _, cancel := range cancelFuncs {
+				cancel()
 			}
+			var resp *http.Response
+			if len(resps) > 0 {
+				resp = resps[0]
+				resps = resps[1:]
+			}
+			return resp, lastErr
 		case <-time.After(15 * time.Second):
 			for _, cancel := range cancelFuncs {
 				cancel()

@@ -91,5 +91,6 @@ func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
 			"error": openaiErr.OpenAIError,
 		})
 	}
+	group.Handlers = append(group.Handlers, retryHandler)
 	return retryHandler
 }

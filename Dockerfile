@@ -1,5 +1,8 @@
 # Initial stage
 FROM python:3.11 as translator
+
+ENV RUN_ENG_TRANSLATE=$RUN_ENG_TRANSLATE
+
 WORKDIR /app
 COPY . .
 RUN chmod +x ./translate-en.sh && ./translate-en.sh

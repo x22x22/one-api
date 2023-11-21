@@ -29,6 +29,7 @@ jobs:
         run: |
           cd web
           npm ci
+          npm run lint
           npm run build
 
       - name: golangci-lint

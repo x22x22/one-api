@@ -1,16 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
-import envCompatible from 'vite-plugin-env-compatible'
-import { createHtmlPlugin } from 'vite-plugin-html'
+import EnvironmentPlugin from 'vite-plugin-environment'
 
 export default defineConfig({
   plugins: [
     react(),
-    createHtmlPlugin(),
-    envCompatible({
-      prefix: "REACT_APP_",
-      mountedPath: "process.env",
-    }),
+    EnvironmentPlugin('all', { prefix: 'REACT_APP_' }),
   ],
   build: {
     outDir: "build"

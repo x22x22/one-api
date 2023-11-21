@@ -15,7 +15,7 @@ FROM node:20 as web-builder
 
 WORKDIR /build
 COPY ./web/package*.json ./
-RUN npm ci
+RUN npm ci --omit=dev
 COPY --from=translator ./app/web .
 COPY ./VERSION .
 RUN REACT_APP_VERSION=$(cat VERSION) npm run build

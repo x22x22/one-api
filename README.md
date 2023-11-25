@@ -51,12 +51,12 @@ _✨ 通过标准的 OpenAI API 格式访问所有的大模型，开箱即用 �
   <a href="https://iamazing.cn/page/reward">赞赏支持</a>
 </p>
 
-> **Note**
+> [!NOTE]
 > 本项目为开源项目，使用者必须在遵循 OpenAI 的[使用条款](https://openai.com/policies/terms-of-use)以及**法律法规**的情况下使用，不得用于非法用途。
 > 
 > 根据[《生成式人工智能服务管理暂行办法》](http://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm)的要求，请勿对中国地区公众提供一切未经备案的生成式人工智能服务。
 
-> **Warning**
+> [!WARNING]
 > 使用 Docker 拉取的最新镜像可能是 `alpha` 版本，如果追求稳定性请手动指定版本。
 
 ## 此分叉版本的主要变更
@@ -80,7 +80,7 @@ _✨ 通过标准的 OpenAI API 格式访问所有的大模型，开箱即用 �
 
 13. `TOKEN_ENCODER_STARTUP_INIT_DISABLED=true` 环境变量现在可以**禁用**自动将Token计数器编码器启动到内存中，禁用会减少空闲内存消耗，但对性能略有影响。
 
-> **Warning**
+> [!WARNING]
 > 使用 root 用户初次登录系统后，务必修改默认密码 `123456`！
 
 ## 功能

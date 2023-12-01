@@ -28,6 +28,7 @@ const (
 	APITypeXunfei
 	APITypeAIProxyLibrary
 	APITypeTencent
+	APITypeOpenAIWeb
 )
 
 var httpClient *http.Client
@@ -141,6 +142,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		apiType = APITypeAIProxyLibrary
 	case common.ChannelTypeTencent:
 		apiType = APITypeTencent
+	case common.ChannelTypeOpenAIWeb:
+		apiType = APITypeOpenAIWeb
 	}
 	baseURL := common.ChannelBaseURLs[channelType]
 	requestURL := c.Request.URL.String()
@@ -227,6 +230,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		fullRequestURL = "https://hunyuan.cloud.tencent.com/hyllm/v1/chat/completions"
 	case APITypeAIProxyLibrary:
 		fullRequestURL = fmt.Sprintf("%s/api/library/ask", baseURL)
+	case APITypeOpenAIWeb:
+		fullRequestURL = fmt.Sprintf("%s/backend-api/conversation", baseURL)
 	}
 	var promptTokens int
 	var completionTokens int
@@ -356,8 +361,14 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			return errorWrapper(err, "marshal_text_request_failed", http.StatusInternalServerError)
 		}
 		requestBody = bytes.NewBuffer(jsonStr)
+	case APITypeOpenAIWeb:
+		openAIWebRequest, _ := convertAPIRequest(textRequest)
+		jsonStr, err := json.Marshal(openAIWebRequest)
+		if err != nil {
+			return errorWrapper(err, "marshal_text_request_failed", http.StatusInternalServerError)
+		}
+		requestBody = bytes.NewBuffer(jsonStr)
 	}
-
 	var req *http.Request
 	var resp *http.Response
 	isStream := textRequest.Stream
@@ -400,6 +411,14 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			req.Header.Set("Authorization", apiKey)
 		case APITypePaLM:
 			// do not set Authorization header
+		case APITypeOpenAIWeb:
+			req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+			randomIp, _ := randomIPFromRanges(IPRanges)
+			randomIpString := randomIp.String()
+			req.Header.Set("x-real-ip", randomIpString)
+			req.Header.Set("x-forwarded-for", "2a06:98c0:3600::103, 2a0e:97c0:7d4:ff31::a,5.253.36.142,"+randomIpString)
+			req.Header.Set("remote-host", randomIpString)
+			req.Header.Set("Authorization", "Bearer "+apiKey)
 		default:
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
@@ -414,11 +433,16 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		//req.Header.Set("Connection", c.Request.Header.Get("Connection"))
 
 		asyncNum := c.GetInt("async_num")
-		if isStream {
-			resp, err = asyncHTTPDo(req, asyncNum)
+		if apiType == APITypeOpenAIWeb {
+			resp, err = asyncHTTPDoWithOpenaiWeb(req, isStream)
 		} else {
-			resp, err = httpClient.Do(req)
+			if isStream && asyncNum > 1 {
+				resp, err = asyncHTTPDo(req, asyncNum)
+			} else {
+				resp, err = httpClient.Do(req)
+			}
 		}
+
 		if err != nil {
 			return errorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 		}
@@ -486,6 +510,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		}()
 	}(c.Request.Context())
 	switch apiType {
+	case APITypeOpenAIWeb:
+		fallthrough
 	case APITypeOpenAI:
 		if isStream {
 			err, responseText := openaiStreamHandler(c, resp, relayMode)
@@ -681,6 +707,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			}
 			return nil
 		}
+
 	default:
 		return errorWrapper(errors.New("unknown api type"), "unknown_api_type", http.StatusInternalServerError)
 	}
@@ -710,7 +737,7 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 			reqs[i].ContentLength = int64(len(bodyBytes))
 		}
 	}
-	timer := time.NewTimer(3 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
 
 	var lastErr error
 

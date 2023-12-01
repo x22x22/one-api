@@ -81,7 +81,7 @@ var AutomaticDisableChannelEnabled = false
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 var ApproximateTokenEnabled = false
-var RetryTimes = 0
+var RetryTimes = 1
 var RelayResponseTimeout = GetOrDefault("RELAY_RESPONSE_TIMEOUT", 15) // unit is second
 var RetryInterval = 0                                                 // unit is millisecond
 
@@ -188,6 +188,7 @@ const (
 	ChannelTypeAIProxyLibrary = 21
 	ChannelTypeFastGPT        = 22
 	ChannelTypeTencent        = 23
+	ChannelTypeOpenAIWeb      = 24
 )
 
 var ChannelBaseURLs = []string{
@@ -215,4 +216,5 @@ var ChannelBaseURLs = []string{
 	"https://api.aiproxy.io",            // 21
 	"https://fastgpt.run/api/openapi",   // 22
 	"https://hunyuan.cloud.tencent.com", //23
+	"https://chat.openai.com",           //24
 }

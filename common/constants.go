@@ -85,6 +85,7 @@ var RetryTimes = 1
 var RelayResponseTimeout = GetOrDefault("RELAY_RESPONSE_TIMEOUT", 15) // unit is second
 var RetryInterval = 0                                                 // unit is millisecond
 
+var RetryInterval = 100 // unit is millisecond
 var RootUserEmail = ""
 
 var IsMasterNode = os.Getenv("NODE_TYPE") != "slave"

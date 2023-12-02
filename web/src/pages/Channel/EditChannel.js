@@ -36,57 +36,57 @@ const EditChannel = () => {
         navigate('/channel');
     };
 
-    const originInputs = {
-        name: '',
-        type: 1,
-        key: '',
-        base_url: '',
-        other: '',
-        model_mapping: '',
-        models: [],
-        groups: ['default']
-    };
-    const [batch, setBatch] = useState(false);
-    const [inputs, setInputs] = useState(originInputs);
-    const [originModelOptions, setOriginModelOptions] = useState([]);
-    const [modelOptions, setModelOptions] = useState([]);
-    const [groupOptions, setGroupOptions] = useState([]);
-    const [basicModels, setBasicModels] = useState([]);
-    const [fullModels, setFullModels] = useState([]);
-    const [customModel, setCustomModel] = useState('');
-    const handleInputChange = (e, {name, value}) => {
-        setInputs((inputs) => ({...inputs, [name]: value}));
-        if (name === 'type' && inputs.models.length === 0) {
-            let localModels = [];
-            switch (value) {
-                case 14:
-                    localModels = ['claude-instant-1', 'claude-2'];
-                    break;
-                case 11:
-                    localModels = ['PaLM-2'];
-                    break;
-                case 15:
-                    localModels = ['ERNIE-Bot', 'ERNIE-Bot-turbo', 'ERNIE-Bot-4', 'Embedding-V1'];
-                    break;
-                case 17:
-                    localModels = ['qwen-turbo', 'qwen-plus', 'text-embedding-v1'];
-                    break;
-                case 16:
-                    localModels = ['chatglm_turbo', 'chatglm_pro', 'chatglm_std', 'chatglm_lite'];
-                    break;
-                case 18:
-                    localModels = ['SparkDesk'];
-                    break;
-                case 19:
-                    localModels = ['360GPT_S2_V9', 'embedding-bert-512-v1', 'embedding_s1_v1', 'semantic_similarity_s1_v1'];
-                    break;
-                case 23:
-                    localModels = ['hunyuan'];
-                    break;
-            }
-            setInputs((inputs) => ({...inputs, models: localModels}));
-        }
-    };
+  const originInputs = {
+    name: '',
+    type: 1,
+    key: '',
+    base_url: '',
+    other: '',
+    model_mapping: '',
+    models: [],
+    groups: ['default']
+  };
+  const [batch, setBatch] = useState(false);
+  const [inputs, setInputs] = useState(originInputs);
+  const [originModelOptions, setOriginModelOptions] = useState([]);
+  const [modelOptions, setModelOptions] = useState([]);
+  const [groupOptions, setGroupOptions] = useState([]);
+  const [basicModels, setBasicModels] = useState([]);
+  const [fullModels, setFullModels] = useState([]);
+  const [customModel, setCustomModel] = useState('');
+  const handleInputChange = (e, { name, value }) => {
+    setInputs((inputs) => ({ ...inputs, [name]: value }));
+    if (name === 'type' && inputs.models.length === 0) {
+      let localModels = [];
+      switch (value) {
+        case 14:
+          localModels = ['claude-instant-1', 'claude-2', 'claude-2.0', 'claude-2.1'];
+          break;
+        case 11:
+          localModels = ['PaLM-2'];
+          break;
+        case 15:
+          localModels = ['ERNIE-Bot', 'ERNIE-Bot-turbo', 'ERNIE-Bot-4', 'Embedding-V1'];
+          break;
+        case 17:
+          localModels = ['qwen-turbo', 'qwen-plus', 'text-embedding-v1'];
+          break;
+        case 16:
+          localModels = ['chatglm_turbo', 'chatglm_pro', 'chatglm_std', 'chatglm_lite'];
+          break;
+        case 18:
+          localModels = ['SparkDesk'];
+          break;
+        case 19:
+          localModels = ['360GPT_S2_V9', 'embedding-bert-512-v1', 'embedding_s1_v1', 'semantic_similarity_s1_v1'];
+          break;
+        case 23:
+          localModels = ['hunyuan'];
+          break;
+      }
+      setInputs((inputs) => ({ ...inputs, models: localModels }));
+    }
+  };
 
     const loadChannel = async () => {
         let res = await API.get(`/api/channel/${channelId}`);

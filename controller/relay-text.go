@@ -36,7 +36,6 @@ var timeoutHTTPClient *http.Client
 var impatientHTTPClient *http.Client
 
 func init() {
-
 	if common.RelayTimeout == 0 {
 		httpClient = &http.Client{
 			Transport: &http.Transport{
@@ -59,6 +58,7 @@ func init() {
 		Transport: &http.Transport{
 			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 			ResponseHeaderTimeout: time.Second * time.Duration(timeout),
+			MaxIdleConnsPerHost:   100,
 		},
 	}
 

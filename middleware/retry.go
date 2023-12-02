@@ -54,7 +54,7 @@ func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
 		maxRetryStr := c.Query("retry")
 		maxRetry, err := strconv.Atoi(maxRetryStr)
 		if err != nil || maxRetryStr == "" || maxRetry < 0 || maxRetry > common.RetryTimes {
-			maxRetry = common.RetryTimes
+			maxRetry = common.Max(common.RetryTimes, 1)
 		}
 		retryDelay := time.Duration(common.RetryInterval) * time.Millisecond
 		for i := 0; i < maxRetry; i++ {

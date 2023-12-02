@@ -22,11 +22,10 @@ type OpenAIError struct {
 	Code    any    `json:"code"`
 }
 
-func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
-	var retryHandler gin.HandlerFunc
+func RetryHandler(group *gin.RouterGroup) {
 	// 获取RetryHandler在当前HandlersChain的位置
 	index := len(group.Handlers) + 1
-	retryHandler = func(c *gin.Context) {
+	retryHandler := func(c *gin.Context) {
 		// Backup request
 		hasBody := c.Request.ContentLength > 0
 		backupHeader := c.Request.Header.Clone()
@@ -96,5 +95,4 @@ func RetryHandler(group *gin.RouterGroup) gin.HandlerFunc {
 		})
 	}
 	group.Handlers = append(group.Handlers, retryHandler)
-	return retryHandler
 }

@@ -92,7 +92,7 @@ func buildTestRequest() *ChatRequest {
 	}
 	testMessage := Message{
 		Role:    "user",
-		Content: "hi",
+		Content: "Ping",
 	}
 	testRequest.Messages = append(testRequest.Messages, testMessage)
 	return testRequest

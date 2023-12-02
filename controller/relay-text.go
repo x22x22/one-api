@@ -756,7 +756,7 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 				return
 			}
 			if resp.StatusCode == 200 {
-				delete(cancelFuncs, i) // remove the cancel function of the successful request
+				delete(cancelFuncs, i)
 			}
 			respCh <- resp
 		}(i, req, cancel)

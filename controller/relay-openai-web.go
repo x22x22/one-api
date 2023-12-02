@@ -87,7 +87,7 @@ func asyncHTTPDoWithOpenaiWeb(req *http.Request, isStream bool) (*http.Response,
 			}
 			reqs = append(reqs, tmpReq)
 
-			response, err := sendConversationRequest(tmpReq)
+			response, err := asyncHTTPDo(tmpReq, 1)
 			if err != nil {
 				errCh <- err
 				return
@@ -102,16 +102,11 @@ func asyncHTTPDoWithOpenaiWeb(req *http.Request, isStream bool) (*http.Response,
 				sseResp, pw = createSSEResponse()
 				respCh <- sseResp
 			}
-			responsePart, continueInfo = Handler(pw, response, id, model)
+			responsePart, continueInfo = HandlerWithClose(pw, response, id, model)
 			fullResponse += responsePart
-			// 以下修复代码来自ChatGPT
-			// 在循环内部创建一个局部作用域，并将资源的引用传递给匿名函数，保证资源将在每次迭代结束时被正确释放
 			if continueInfo == nil {
 				break
 			}
-			//if HandleRequestError(c, response) {
-			//	return
-			//}
 		}
 
 		if !isStream {
@@ -129,20 +124,7 @@ func asyncHTTPDoWithOpenaiWeb(req *http.Request, isStream bool) (*http.Response,
 	}
 }
 
-func sendConversationRequest(req *http.Request) (*http.Response, error) {
-	resp, err := asyncHTTPDo(req, 1)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-func Handler(pw *io.PipeWriter, response *http.Response, id string, model string) (string, *ContinueInfo) {
+func HandlerWithClose(pw *io.PipeWriter, response *http.Response, id string, model string) (string, *ContinueInfo) {
 	maxTokens := false
 
 	// Create a bufio.Reader from the response body

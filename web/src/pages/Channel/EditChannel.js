@@ -275,7 +275,7 @@ const EditChannel = () => {
                         )
                     }
                     {
-                        inputs.type === 8 || inputs.type === 24 && (
+                       ( inputs.type === 8 || inputs.type === 24 )&& (
                             <Form.Field>
                                 <Form.Input
                                     label='Base URL'

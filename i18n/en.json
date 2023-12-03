@@ -653,6 +653,7 @@
   "从 .env 文件加载环境变量": "Load environment variables from .env file",
 
   "成功时自动启用通道": "Automatically enable channel when successful",
+  "补全 tokens 非预期返回 0": "Unexpectedly returned 0 when completing tokens",
 
   "本项目 OneAPI 原作 JustSong ，由 ckt1031 改进，本源代码遵循 MIT 协议": "OneAPI by JustSong, improved by ckt1031, and follows MIT license",
   "警告": "Warning",

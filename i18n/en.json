@@ -120,6 +120,7 @@
   " 年 ": " y ",
   "未测试": "Not tested",
   "通道 ${name} 测试成功，耗时 ${time.toFixed(2)} 秒。": "Channel ${name} test succeeded, time consumed ${time.toFixed(2)} s.",
+  "已成功开始测试所有通道，请刷新页面查看结果。": "All channels have been successfully tested, please refresh the page to view the results.",
   "已成功开始测试所有已启用通道，请刷新页面查看结果。": "All enabled channels have been successfully tested, please refresh the page to view the results.",
   "通道 ${name} 余额更新成功！": "Channel ${name} balance updated successfully!",
   "已更新完毕所有已启用通道余额！": "The balance of all enabled channels has been updated!",
@@ -140,6 +141,7 @@
   "启用": "Enable",
   "编辑": "Edit",
   "添加新的渠道": "Add a new channel",
+  "测试所有通道": "Test all channels",
   "测试所有已启用通道": "Test all enabled channels",
   "更新所有已启用通道余额": "Update the balance of all enabled channels",
   "刷新": "Refresh",
@@ -649,6 +651,8 @@
 
   "解析请求体失败": "Failed to parse request body",
   "从 .env 文件加载环境变量": "Load environment variables from .env file",
+
+  "成功时自动启用通道": "Automatically enable channel when successful",
 
   "本项目 OneAPI 原作 JustSong ，由 ckt1031 改进，本源代码遵循 MIT 协议": "OneAPI by JustSong, improved by ckt1031, and follows MIT license",
   "警告": "Warning",

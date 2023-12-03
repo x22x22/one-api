@@ -145,6 +145,9 @@ func testChannel(channel *model.Channel, request ChatRequest) (err error, openai
 			return fmt.Errorf("Error: %s\nResp body: %s", err, body), nil
 		}
 		if response.Usage.CompletionTokens == 0 {
+			if response.Error.Message == "" {
+				response.Error.Message = "补全 tokens 非预期返回 0"
+			}
 			return fmt.Errorf("type %s, code %v, message %s", response.Error.Type, response.Error.Code, response.Error.Message), &response.Error
 		}
 	}
@@ -208,32 +211,30 @@ func TestChannel(c *gin.Context) {
 var testAllChannelsLock sync.Mutex
 var testAllChannelsRunning bool = false
 
-// disable & notify
-func disableChannel(channelId int, channelName string, reason string) {
+func notifyRootUser(subject string, content string) {
 	if common.RootUserEmail == "" {
 		common.RootUserEmail = model.GetRootUserEmail()
 	}
-	model.UpdateChannelStatusById(channelId, common.ChannelStatusAutoDisabled)
-	subject := fmt.Sprintf("通道「%s」（#%d）已被禁用", channelName, channelId)
-	content := fmt.Sprintf("通道「%s」（#%d）已被禁用，原因：%s", channelName, channelId, reason)
 	err := common.SendEmail(subject, common.RootUserEmail, content)
 	if err != nil {
 		common.SysError(fmt.Sprintf("failed to send email: %s", err.Error()))
 	}
 }
 
-// enable
+// disable & notify
+func disableChannel(channelId int, channelName string, reason string) {
+	model.UpdateChannelStatusById(channelId, common.ChannelStatusAutoDisabled)
+	subject := fmt.Sprintf("通道「%s」（#%d）已被禁用", channelName, channelId)
+	content := fmt.Sprintf("通道「%s」（#%d）已被禁用，原因：%s", channelName, channelId, reason)
+	notifyRootUser(subject, content)
+}
+
+// enable & notify
 func enableChannel(channelId int, channelName string) {
-	if common.RootUserEmail == "" {
-		common.RootUserEmail = model.GetRootUserEmail()
-	}
 	model.UpdateChannelStatusById(channelId, common.ChannelStatusEnabled)
-	subject := fmt.Sprintf("通道「%s」（#%d）已被重新启用", channelName, channelId)
-	content := fmt.Sprintf("通道「%s」（#%d）通道现在满足了服务器要求, 已被重新启用并重新开始运行", channelName, channelId)
-	err := common.SendEmail(subject, common.RootUserEmail, content)
-	if err != nil {
-		common.SysError(fmt.Sprintf("failed to send email: %s", err.Error()))
-	}
+	subject := fmt.Sprintf("通道「%s」（#%d）已被启用", channelName, channelId)
+	content := fmt.Sprintf("通道「%s」（#%d）已被启用", channelName, channelId)
+	notifyRootUser(subject, content)
 }
 
 func testAllChannels(notify bool) error {
@@ -257,25 +258,20 @@ func testAllChannels(notify bool) error {
 	}
 	go func() {
 		for _, channel := range channels {
-			if channel.Status == common.ChannelStatusManuallyDisabled || channel.Status == common.ChannelStatusUnknown {
-				continue
-			}
+			isChannelEnabled := channel.Status == common.ChannelStatusEnabled
 			tik := time.Now()
 			testRequest := buildTestRequest(channel.AllowStreaming == common.ChannelAllowStreamEnabled)
 			err, openaiErr := testChannel(channel, *testRequest)
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
-			channelBeninDisabled := false
-			if milliseconds > disableThreshold {
-				log.Printf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0)
+			if isChannelEnabled && milliseconds > disableThreshold {
+				err = errors.New(fmt.Sprintf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0))
 				disableChannel(channel.Id, channel.Name, err.Error())
-				channelBeninDisabled = true
 			}
-			if shouldDisableChannel(openaiErr, -1) {
+			if isChannelEnabled && shouldDisableChannel(openaiErr, -1) {
 				disableChannel(channel.Id, channel.Name, err.Error())
-				channelBeninDisabled = true
 			}
-			if channel.Status == common.ChannelStatusAutoDisabled && common.AutoReEnableFailedChannelEnabled && !channelBeninDisabled {
+			if !isChannelEnabled && shouldEnableChannel(err, openaiErr) {
 				enableChannel(channel.Id, channel.Name)
 			}
 			channel.UpdateResponseTime(milliseconds)

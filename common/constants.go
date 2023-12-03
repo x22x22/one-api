@@ -54,8 +54,6 @@ var EmailDomainWhitelist = []string{
 	"foxmail.com",
 }
 
-var AutoReEnableFailedChannelEnabled = false
-
 var DebugEnabled = os.Getenv("DEBUG") == "true"
 var MemoryCacheEnabled = os.Getenv("MEMORY_CACHE_ENABLED") == "true"
 
@@ -88,6 +86,7 @@ var QuotaForInviter = 0
 var QuotaForInvitee = 0
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
+var AutomaticEnableChannelEnabled = false
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 var ApproximateTokenEnabled = false

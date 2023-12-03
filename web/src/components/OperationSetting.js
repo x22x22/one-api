@@ -17,6 +17,7 @@ const OperationSetting = () => {
     QuotaPerUnit: 0,
     AutoReEnableFailedChannelEnabled: '',
     AutomaticDisableChannelEnabled: '',
+    AutomaticEnableChannelEnabled: '',
     ChannelDisableThreshold: 0,
     LogConsumeEnabled: '',
     DisplayInCurrencyEnabled: '',

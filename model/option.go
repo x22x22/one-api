@@ -34,8 +34,8 @@ func InitOptionMap() {
 	common.OptionMap["GoogleOAuthEnabled"] = strconv.FormatBool(common.GoogleOAuthEnabled)
 	common.OptionMap["TurnstileCheckEnabled"] = strconv.FormatBool(common.TurnstileCheckEnabled)
 	common.OptionMap["RegisterEnabled"] = strconv.FormatBool(common.RegisterEnabled)
-	common.OptionMap["AutoReEnableFailedChannelEnabled"] = strconv.FormatBool(common.AutoReEnableFailedChannelEnabled)
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
+	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	common.OptionMap["ApproximateTokenEnabled"] = strconv.FormatBool(common.ApproximateTokenEnabled)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
@@ -157,8 +157,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.EmailDomainRestrictionEnabled = boolValue
 		case "AutomaticDisableChannelEnabled":
 			common.AutomaticDisableChannelEnabled = boolValue
-		case "AutoReEnableFailedChannelEnabled":
-			common.AutoReEnableFailedChannelEnabled = boolValue
+		case "AutomaticEnableChannelEnabled":
+			common.AutomaticEnableChannelEnabled = boolValue
 		case "ApproximateTokenEnabled":
 			common.ApproximateTokenEnabled = boolValue
 		case "LogConsumeEnabled":

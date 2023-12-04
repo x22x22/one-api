@@ -145,6 +145,10 @@ func updateOptionMap(key string, value string) (err error) {
 			common.GitHubOAuthEnabled = boolValue
 		case "DiscordOAuthEnabled":
 			common.DiscordOAuthEnabled = boolValue
+		case "DiscordGuildCheckEnabled":
+			common.DiscordGuildCheckEnabled = boolValue
+		case "DiscordMemberRoleCheckEnabled":
+			common.DiscordMemberRoleCheckEnabled = boolValue
 		case "WeChatAuthEnabled":
 			common.WeChatAuthEnabled = boolValue
 		case "GoogleOAuthEnabled":
@@ -193,6 +197,10 @@ func updateOptionMap(key string, value string) (err error) {
 		common.DiscordClientId = value
 	case "DiscordClientSecret":
 		common.DiscordClientSecret = value
+	case "DiscordGuildId":
+		common.DiscordGuildId = value
+	case "DiscordMemberRoleId":
+		common.DiscordMemberRoleId = value
 	case "Footer":
 		common.Footer = value
 	case "SystemName":

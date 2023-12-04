@@ -23,6 +23,8 @@ func GetStatus(c *gin.Context) {
 			"github_client_id":    common.GitHubClientId,
 			"discord_oauth":       common.DiscordOAuthEnabled,
 			"discord_client_id":   common.DiscordClientId,
+			"discord_check_role":  common.DiscordMemberRoleCheckEnabled,
+			"discord_check_guild": common.DiscordGuildCheckEnabled,
 			"google_oauth":        common.GoogleOAuthEnabled,
 			"google_client_id":    common.GoogleClientId,
 			"system_name":         common.SystemName,

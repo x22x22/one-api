@@ -71,6 +71,12 @@ var GitHubClientSecret = ""
 var DiscordClientId = ""
 var DiscordClientSecret = ""
 
+var DiscordMemberRoleId = ""
+var DiscordGuildId = ""
+
+var DiscordGuildCheckEnabled = false
+var DiscordMemberRoleCheckEnabled = false
+
 var WeChatServerAddress = ""
 var WeChatServerToken = ""
 var WeChatAccountQRCodeImageURL = ""

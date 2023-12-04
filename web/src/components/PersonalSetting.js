@@ -144,8 +144,10 @@ const PersonalSetting = () => {
   };
 
   const openDiscordOAuth = () => {
+    const checkGuildQuery = status.discord_check_guild ? `%20guilds` : '';
+    const checkRoleQuery = status.discord_check_role ? `%20guilds.members.read` : '';
     window.open(
-      `https://discord.com/api/oauth2/authorize?client_id=${status.discord_client_id}&response_type=code&redirect_uri=${window.location.origin}/oauth/discord&scope=identify`,
+      `https://discord.com/api/oauth2/authorize?client_id=${status.discord_client_id}&response_type=code&redirect_uri=${window.location.origin}/oauth/discord&scope=identify` + checkGuildQuery + checkRoleQuery,
     );
   };
 

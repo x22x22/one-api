@@ -20,6 +20,14 @@ type DiscordOAuthResponse struct {
 	TokenType   string `json:"token_type"`
 }
 
+type DiscordUserGuildsResponse struct {
+	Id string `json:"id"`
+}
+
+type DiscordGuildMemberResponse struct {
+	Roles []string `json:"roles"`
+}
+
 type DiscordUser struct {
 	Id       string `json:"id"`
 	Username string `json:"username"`
@@ -32,8 +40,17 @@ func getDiscordUserInfoByCode(codeFromURLParamaters string, host string) (*Disco
 
 	RequestClient := &http.Client{}
 
-	accessTokenBody := bytes.NewBuffer([]byte(fmt.Sprintf(
-		"client_id=%s&client_secret=%s&grant_type=authorization_code&redirect_uri=%s/oauth/discord&code=%s&scope=identify",
+	url := "client_id=%s&client_secret=%s&grant_type=authorization_code&redirect_uri=%s/oauth/discord&code=%s&scope=identify"
+
+	if common.DiscordGuildCheckEnabled {
+		url = url + "%20guilds"
+	}
+
+	if common.DiscordMemberRoleCheckEnabled {
+		url = url + "%20guilds.members.read"
+	}
+
+	accessTokenBody := bytes.NewBuffer([]byte(fmt.Sprintf(url,
 		common.DiscordClientId, common.DiscordClientSecret, common.ServerAddress, codeFromURLParamaters,
 	)))
 
@@ -92,6 +109,80 @@ func getDiscordUserInfoByCode(codeFromURLParamaters string, host string) (*Disco
 	}
 
 	defer resp.Body.Close()
+
+	if common.DiscordGuildId != "" && common.DiscordGuildCheckEnabled {
+		var discordUserGuildsResponse []DiscordUserGuildsResponse
+
+		// Get User Info
+		req, _ = http.NewRequest("GET", "https://discord.com/api/users/@me/guilds", nil)
+
+		req.Header = http.Header{
+			"Content-Type":  []string{"application/json"},
+			"Authorization": []string{accessToken},
+		}
+
+		resp, err = RequestClient.Do(req)
+
+		if resp.StatusCode != 200 || err != nil {
+			return nil, errors.New("Invalid Discord User Guild Info!")
+		}
+
+		json.NewDecoder(resp.Body).Decode(&discordUserGuildsResponse)
+
+		if len(discordUserGuildsResponse) == 0 {
+			return nil, errors.New("You are not in the Discord server!")
+		}
+
+		joinedDiscordServer := false
+
+		for _, guild := range discordUserGuildsResponse {
+			if guild.Id == common.DiscordGuildId {
+				joinedDiscordServer = true
+				break
+			}
+		}
+
+		if !joinedDiscordServer {
+			return nil, errors.New("You are not in the Discord server!")
+		}
+
+		if common.DiscordMemberRoleId != "" && common.DiscordMemberRoleCheckEnabled {
+			// /users/@me/guilds/{guild.id}/member
+			req, _ = http.NewRequest("GET", fmt.Sprintf("https://discord.com/api/users/@me/guilds/%s/member", common.DiscordGuildId), nil)
+
+			req.Header = http.Header{
+				"Content-Type":  []string{"application/json"},
+				"Authorization": []string{accessToken},
+			}
+
+			resp, err = RequestClient.Do(req)
+
+			if resp.StatusCode != 200 || err != nil {
+				return nil, errors.New("Invalid Discord User Guild Member Info!")
+			}
+
+			var discordUserGuildMemberResponse DiscordGuildMemberResponse
+
+			json.NewDecoder(resp.Body).Decode(&discordUserGuildMemberResponse)
+
+			if len(discordUserGuildMemberResponse.Roles) == 0 {
+				return nil, errors.New("You do not have the required role to join the Discord server!")
+			}
+
+			isMember := false
+
+			for _, role := range discordUserGuildMemberResponse.Roles {
+				if role == common.DiscordMemberRoleId {
+					isMember = true
+					break
+				}
+			}
+
+			if !isMember {
+				return nil, errors.New("You do not have the required role to join the Discord server!")
+			}
+		}
+	}
 
 	return &discordUser, nil
 }

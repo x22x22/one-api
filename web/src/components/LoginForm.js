@@ -48,8 +48,10 @@ const LoginForm = () => {
   };
 
   const onDiscordOAuthClicked = () => {
+    const checkGuildQuery = status.discord_check_guild ? `%20guilds` : '';
+    const checkRoleQuery = status.discord_check_role ? `%20guilds.members.read` : '';
     window.open(
-      `https://discord.com/oauth2/authorize?response_type=code&client_id=${status.discord_client_id}&redirect_uri=${window.location.origin}/oauth/discord&scope=identify`,
+      `https://discord.com/oauth2/authorize?response_type=code&client_id=${status.discord_client_id}&redirect_uri=${window.location.origin}/oauth/discord&scope=identify` + checkGuildQuery + checkRoleQuery,
     );
   };
 

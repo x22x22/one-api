@@ -14,6 +14,10 @@ const SystemSetting = () => {
     GitHubClientSecret: '',
     DiscordClientId: '',
     DiscordClientSecret: '',
+    DiscordGuildCheckEnabled: '',
+    DiscordGuildId: '',
+    DiscordMemberRoleCheckEnabled: '',
+    DiscordMemberRoleId: '',
     Notice: '',
     SMTPServer: '',
     SMTPPort: '',
@@ -85,6 +89,8 @@ const SystemSetting = () => {
       case 'DiscordOAuthEnabled':
       case 'WeChatAuthEnabled':
       case 'GoogleOAuthEnabled':
+      case 'DiscordGuildCheckEnabled':
+      case 'DiscordMemberRoleCheckEnabled':
       case 'TurnstileCheckEnabled':
       case 'EmailDomainRestrictionEnabled':
       case 'RegisterEnabled':
@@ -125,6 +131,8 @@ const SystemSetting = () => {
       name === 'GitHubClientSecret' ||
       name === 'DiscordClientId' ||
       name === 'DiscordClientSecret' ||
+      name === 'DiscordGuildId' ||
+      name === 'DiscordMemberRoleId' ||
       name === 'WeChatServerAddress' ||
       name === 'WeChatServerToken' ||
       name === 'WeChatAccountQRCodeImageURL' ||
@@ -584,6 +592,34 @@ const SystemSetting = () => {
               autoComplete='new-password'
               value={inputs.DiscordClientSecret}
               placeholder='敏感信息不会发送到前端显示'
+            />
+            <Form.Checkbox
+              checked={inputs.DiscordGuildCheckEnabled === 'true'}
+              label='Check Discord Server Join Status'
+              name='DiscordGuildCheckEnabled'
+              onChange={handleInputChange}
+            />
+            <Form.Input
+              label='Discord Guild Id'
+              name='DiscordGuildId'
+              onChange={handleInputChange}
+              autoComplete='new-password'
+              value={inputs.DiscordGuildId}
+              placeholder='Enter your managed Discord guild ID'
+            />
+            <Form.Checkbox
+              checked={inputs.DiscordMemberRoleCheckEnabled === 'true'}
+              label='Check Server Role'
+              name='DiscordMemberRoleCheckEnabled'
+              onChange={handleInputChange}
+            />
+            <Form.Input
+              label='Discord Member Role Id'
+              name='DiscordMemberRoleId'
+              onChange={handleInputChange}
+              autoComplete='new-password'
+              value={inputs.DiscordMemberRoleId}
+              placeholder='Enter your member role Id for your Discord guild'
             />
           </Form.Group>
           <Form.Button onClick={submitDiscordOAuth}>

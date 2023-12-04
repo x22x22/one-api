@@ -127,7 +127,11 @@ func getDiscordUserInfoByCode(codeFromURLParamaters string, host string) (*Disco
 			return nil, errors.New("Invalid Discord User Guild Info!")
 		}
 
-		json.NewDecoder(resp.Body).Decode(&discordUserGuildsResponse)
+		err = json.NewDecoder(resp.Body).Decode(&discordUserGuildsResponse)
+
+		if err != nil {
+			return nil, err
+		}
 
 		if len(discordUserGuildsResponse) == 0 {
 			return nil, errors.New("You are not in the Discord server!")
@@ -163,7 +167,11 @@ func getDiscordUserInfoByCode(codeFromURLParamaters string, host string) (*Disco
 
 			var discordUserGuildMemberResponse DiscordGuildMemberResponse
 
-			json.NewDecoder(resp.Body).Decode(&discordUserGuildMemberResponse)
+			err = json.NewDecoder(resp.Body).Decode(&discordUserGuildMemberResponse)
+
+			if err != nil {
+				return nil, err
+			}
 
 			if len(discordUserGuildMemberResponse.Roles) == 0 {
 				return nil, errors.New("You do not have the required role to join the Discord server!")

@@ -110,5 +110,11 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			groupRoute.GET("/", controller.GetGroups)
 		}
+
+		abilityRoute := apiRouter.Group("/ability")
+		abilityRoute.Use(middleware.AdminAuth())
+		{
+			abilityRoute.PUT("/all", controller.UpdateAllAbilities)
+		}
 	}
 }

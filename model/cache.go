@@ -141,8 +141,8 @@ func InitChannelCache() {
 	for _, channel := range channels {
 		newChannelId2channel[channel.Id] = channel
 	}
-	var abilities []*Ability
-	DB.Find(&abilities)
+	var abilities []*Ability = GenAbilitiesByChannels(channels)
+	//DB.Find(&abilities)
 	groups := make(map[string]bool)
 	for _, ability := range abilities {
 		groups[ability.Group] = true
@@ -211,4 +211,41 @@ func CacheGetRandomSatisfiedChannel(group string, model string) (*Channel, error
 	}
 	idx := rand.Intn(endIdx)
 	return channels[idx], nil
+}
+
+func UpdateAllAbilities() error {
+	channelSyncLock.Lock()
+	defer channelSyncLock.Unlock()
+	channels := make([]*Channel, 0)
+	err := DB.Find(&channels).Error
+	if err != nil {
+		return err
+	}
+	abilities := GenAbilitiesByChannels(channels)
+	err = DB.Where("1 = 1").Delete(&Ability{}).Error
+	if err != nil {
+		return err
+	}
+	return DB.CreateInBatches(&abilities, 40).Error
+}
+
+func GenAbilitiesByChannels(channels []*Channel) []*Ability {
+	abilities := make([]*Ability, 0)
+	for _, channel := range channels {
+		models_ := strings.Split(channel.Models, ",")
+		groups_ := strings.Split(channel.Group, ",")
+		for _, model := range models_ {
+			for _, group := range groups_ {
+				ability := &Ability{
+					Group:     group,
+					Model:     model,
+					ChannelId: channel.Id,
+					Enabled:   channel.Status == common.ChannelStatusEnabled,
+					Priority:  channel.Priority,
+				}
+				abilities = append(abilities, ability)
+			}
+		}
+	}
+	return abilities
 }

@@ -61,7 +61,7 @@ func GetChannelById(id int, selectAll bool) (*Channel, error) {
 
 func BatchInsertChannels(channels []Channel) error {
 	var err error
-	err = DB.CreateInBatches(&channels, 20).Error
+	err = DB.CreateInBatches(&channels, 40).Error
 	if err != nil {
 		return err
 	}

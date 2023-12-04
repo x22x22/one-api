@@ -47,10 +47,8 @@ services:
         - one-api-slave
   redis:
     image: redis:latest
-    container_name: redis
     restart: always
   watchtower:
-    container_name: watchtower
     image: containrrr/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

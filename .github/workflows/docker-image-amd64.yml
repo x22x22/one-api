@@ -43,7 +43,6 @@ jobs:
         with:
           images: |
             ckt1031/one-api
-            ghcr.io/${{ github.repository }}
 
       - name: Build and push Docker images
         uses: docker/build-push-action@v5

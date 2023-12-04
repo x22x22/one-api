@@ -279,22 +279,14 @@ func Relay(c *gin.Context) {
 	}
 	if err != nil {
 		requestId := c.GetString(common.RequestIdKey)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					//ignore
-				}
-			}()
+		channelId := c.GetInt("channel_id")
+		common.LogError(c.Request.Context(), fmt.Sprintf("relay error (channel #%d): %s", channelId, err.Message))
+		// https://platform.openai.com/docs/guides/error-codes/api-errors
+		if shouldDisableChannel(&err.OpenAIError, err.StatusCode) {
 			channelId := c.GetInt("channel_id")
-			common.LogError(c.Request.Context(), fmt.Sprintf("relay error (channel #%d): %s", channelId, err.Message))
-			// https://platform.openai.com/docs/guides/error-codes/api-errors
-			if shouldDisableChannel(&err.OpenAIError, err.StatusCode) {
-				channelId := c.GetInt("channel_id")
-				channelName := c.GetString("channel_name")
-				disableChannel(channelId, channelName, err.Message)
-			}
-		}()
-
+			channelName := c.GetString("channel_name")
+			disableChannel(channelId, channelName, err.Message)
+		}
 		if err.StatusCode == http.StatusTooManyRequests {
 			err.OpenAIError.Message = "当前分组上游负载已饱和，请稍后再试"
 		}

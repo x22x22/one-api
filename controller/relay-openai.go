@@ -8,7 +8,13 @@ import (
 	"net/http"
 	"one-api/common"
 	"strings"
+	"time"
 )
+
+type PreData struct {
+	ID    string `json:"id"`
+	Model string `json:"model"`
+}
 
 func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*OpenAIErrorWithStatusCode, string) {
 	responseText := ""
@@ -27,6 +33,8 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 	})
 	dataChan := make(chan string)
 	stopChan := make(chan bool)
+	ticker := time.NewTicker(5 * time.Second)
+
 	go func() {
 		for scanner.Scan() {
 			data := scanner.Text()
@@ -67,14 +75,23 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 		}
 		stopChan <- true
 	}()
+	var pre = &ChatCompletionChunk{}
 	setEventStreamHeaders(c)
 	c.Stream(func(w io.Writer) bool {
 		select {
+		case <-ticker.C:
+			if pre.ID != "" {
+				pre.Choices[0].Delta.Content = ""
+				c.Render(-1, common.CustomEvent{Data: "data: " + pre.String()})
+			}
+			return true
 		case data := <-dataChan:
 			data = strings.TrimSuffix(data, "\r")
 			c.Render(-1, common.CustomEvent{Data: "data: " + data})
+			_ = json.Unmarshal([]byte(data), &pre)
 			return true
 		case <-stopChan:
+			ticker.Stop()
 			return false
 		}
 	})

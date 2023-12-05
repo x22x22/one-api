@@ -429,7 +429,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		if apiType == APITypeOpenAIWeb {
 			resp, err = asyncHTTPDoWithOpenaiWeb(req, isStream)
 		} else {
-			if isStream && asyncNum > 1 {
+			if isStream {
 				resp, err = asyncHTTPDo(req, asyncNum)
 			} else {
 				resp, err = httpClient.Do(req)

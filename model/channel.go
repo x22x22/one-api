@@ -108,7 +108,6 @@ func (channel *Channel) Insert() error {
 
 func (channel *Channel) Update() error {
 	var err error
-	defer InitChannelCache()
 	err = DB.Model(channel).Updates(channel).Error
 	if err != nil {
 		return err

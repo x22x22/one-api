@@ -1,4 +1,4 @@
-version: '3.4'
+version: '3.7'
 
 services:
   one-api:
@@ -17,6 +17,10 @@ services:
       - REDIS_CONN_STRING=redis://redis:6379/0
     depends_on:
       - redis
+    deploy:
+      resources:
+        limits:
+          memory: 200M
   one-api-slave:
     image: ahhhliu/one-api:latest
     restart: always
@@ -33,6 +37,9 @@ services:
     depends_on:
       - redis
     deploy:
+      resources:
+        limits:
+          memory: 150M
       replicas: 2
       restart_policy:
         condition: on-failure

@@ -7,6 +7,8 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
+	"net/http"
+	_ "net/http/pprof"
 	"one-api/common"
 	"one-api/controller"
 	"one-api/middleware"
@@ -101,6 +103,12 @@ func main() {
 	if port == "" {
 		port = strconv.Itoa(*common.Port)
 	}
+	go func() {
+		err := http.ListenAndServe("0.0.0.0:8899", nil)
+		if err != nil {
+			return
+		}
+	}()
 	err = server.Run(":" + port)
 	if err != nil {
 		common.FatalLog("failed to start HTTP server: " + err.Error())

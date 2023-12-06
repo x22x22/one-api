@@ -61,6 +61,7 @@ func GetChannelById(id int, selectAll bool) (*Channel, error) {
 
 func BatchInsertChannels(channels []Channel) error {
 	var err error
+	defer InitChannelCache()
 	err = DB.CreateInBatches(&channels, 40).Error
 	if err != nil {
 		return err
@@ -107,6 +108,7 @@ func (channel *Channel) Insert() error {
 
 func (channel *Channel) Update() error {
 	var err error
+	defer InitChannelCache()
 	err = DB.Model(channel).Updates(channel).Error
 	if err != nil {
 		return err
@@ -178,6 +180,12 @@ func DeleteChannelByStatus(status int64) (int64, error) {
 }
 
 func DeleteDisabledChannel() (int64, error) {
+	defer func() {
+		err := UpdateAllAbilities()
+		if err != nil {
+			common.SysError("failed to update all abilities: " + err.Error())
+		}
+	}()
 	result := DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
 	return result.RowsAffected, result.Error
 }

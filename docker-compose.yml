@@ -7,6 +7,7 @@ services:
     command: --log-dir /app/logs
     ports:
       - "4000:3000"
+      - "8899:8899"
     volumes:
       - ./data:/data
       - ./logs:/app/logs

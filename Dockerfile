@@ -31,5 +31,6 @@ RUN apk update \
 
 COPY --from=builder2 /build/one-api /
 EXPOSE 3000
+EXPOSE 8899
 WORKDIR /data
 ENTRYPOINT ["/one-api"]

@@ -19,6 +19,7 @@ type PreData struct {
 func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*OpenAIErrorWithStatusCode, string) {
 	responseText := ""
 	scanner := bufio.NewScanner(resp.Body)
+	defer resp.Body.Close()
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if atEOF && len(data) == 0 {
 			return 0, nil, nil
@@ -34,8 +35,10 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 	dataChan := make(chan string)
 	stopChan := make(chan bool)
 	ticker := time.NewTicker(5 * time.Second)
-
+	defer ticker.Stop() // 确保 ticker 会被停止
 	go func() {
+		defer close(dataChan) // 确保 dataChan 会被关闭
+		defer close(stopChan) // 确保 stopChan 会被关闭
 		for scanner.Scan() {
 			data := scanner.Text()
 			if len(data) < 6 { // ignore blank line or wrong format
@@ -91,14 +94,9 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 			_ = json.Unmarshal([]byte(data), &pre)
 			return true
 		case <-stopChan:
-			ticker.Stop()
 			return false
 		}
 	})
-	err := resp.Body.Close()
-	if err != nil {
-		return errorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), ""
-	}
 	return nil, responseText
 }
 

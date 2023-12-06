@@ -439,14 +439,8 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		if err != nil {
 			return errorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 		}
-		err = req.Body.Close()
-		if err != nil {
-			return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
-		}
-		err = c.Request.Body.Close()
-		if err != nil {
-			return errorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
-		}
+		_ = req.Body.Close()
+		_ = c.Request.Body.Close()
 		isStream = isStream || strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
 
 		if resp.StatusCode != http.StatusOK {
@@ -724,7 +718,6 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 	} else {
 		for i := 0; i < asyncNum; i++ {
 			reqs[i] = req.Clone(req.Context())
-			// 在每个复制的请求中创建一个新的 bytes.Reader
 			reqs[i].Body = io.NopCloser(bytes.NewReader(bodyBytes))
 			reqs[i].ContentLength = int64(len(bodyBytes))
 		}
@@ -732,11 +725,14 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 	timer := time.NewTimer(5 * time.Second)
 
 	var lastErr error
+	var mux sync.Mutex
 
 	for i, req := range reqs {
 		wg.Add(1)
 		ctx, cancel := context.WithCancel(context.Background())
+		mux.Lock()
 		cancelFuncs[i] = cancel
+		mux.Unlock()
 		go func(i int, req *http.Request, cancel context.CancelFunc) {
 			defer wg.Done()
 			defer func() {
@@ -748,11 +744,16 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 			defer req.Body.Close()
 			resp, err := timeoutHTTPClient.Do(req)
 			if err != nil {
+				mux.Lock()
 				lastErr = err
+				mux.Unlock()
+				cancel()
 				return
 			}
 			if resp.StatusCode == 200 {
+				mux.Lock()
 				delete(cancelFuncs, i)
+				mux.Unlock()
 			}
 			respCh <- resp
 		}(i, req, cancel)
@@ -760,10 +761,9 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 
 	go func() {
 		wg.Wait()
-		done <- true
+		close(done)
 		close(respCh)
 		close(errCh)
-		close(done)
 	}()
 
 	defer func() {
@@ -780,9 +780,11 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 			if ok {
 				if resp.StatusCode == 200 {
 					timer.Stop()
+					mux.Lock()
 					for _, cancel := range cancelFuncs {
 						cancel()
 					}
+					mux.Unlock()
 					return resp, nil
 				}
 				resps = append(resps, resp)
@@ -799,7 +801,9 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 					}()
 					resp, err := timeoutHTTPClient.Do(req)
 					if err != nil {
+						mux.Lock()
 						lastErr = err
+						mux.Unlock()
 						return
 					}
 					respCh <- resp
@@ -807,9 +811,11 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 			}
 		case <-done:
 			timer.Stop()
+			mux.Lock()
 			for _, cancel := range cancelFuncs {
 				cancel()
 			}
+			mux.Unlock()
 			var resp *http.Response
 			if len(resps) > 0 {
 				resp = resps[0]

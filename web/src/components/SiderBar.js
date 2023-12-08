@@ -75,6 +75,12 @@ let headerButtons = [
         to: '/log',
         icon: <IconHistogram/>
     },
+    // {
+    //     text: '绘图',
+    //     itemKey: 'midjourney',
+    //     to: '/midjourney',
+    //     icon: <IconImage/>
+    // },
     {
         text: '设置',
         itemKey: 'setting',

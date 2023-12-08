@@ -136,7 +136,10 @@ func HandlerWithClose(pw *io.PipeWriter, response *http.Response, id string, mod
 	for {
 		data, err := eventStreamReader.ReadEvent()
 		if err != nil {
-			break
+			if err == io.EOF {
+				break
+			}
+			continue
 		}
 		event, err := processEvent(data)
 		if err != nil {

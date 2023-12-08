@@ -126,7 +126,7 @@ func (e *EventStreamReader) ReadEvent() ([]byte, error) {
 		return event, nil
 	}
 	if err := e.scanner.Err(); err != nil {
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			return nil, io.EOF
 		}
 		return nil, err

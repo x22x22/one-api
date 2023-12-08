@@ -30,7 +30,10 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 		for {
 			data, err := eventStreamReader.ReadEvent()
 			if err != nil {
-				break
+				if err == io.EOF {
+					break
+				}
+				continue
 			}
 
 			event, err := processEvent(data)

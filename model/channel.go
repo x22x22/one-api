@@ -26,25 +26,38 @@ type Channel struct {
 	AsyncNum           int     `json:"async_num" gorm:"column:async_num;default:1"`
 	ModelMapping       *string `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
 	Priority           *int64  `json:"priority" gorm:"bigint;default:0"`
+	AutoBan            *int    `json:"auto_ban" gorm:"default:1"`
 }
 
-func GetAllChannels(startIdx int, num int, selectAll bool) ([]*Channel, error) {
+func GetAllChannels(startIdx int, num int, selectAll bool, idSort bool) ([]*Channel, error) {
 	var channels []*Channel
 	var err error
+	order := "priority desc"
+	if idSort {
+		order = "id desc"
+	}
 	if selectAll {
-		err = DB.Order("id desc").Find(&channels).Error
+		err = DB.Order(order).Find(&channels).Error
 	} else {
-		err = DB.Order("id desc").Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
+		err = DB.Order(order).Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
 	}
 	return channels, err
 }
 
-func SearchChannels(keyword string) (channels []*Channel, err error) {
+func SearchChannels(keyword string, group string) (channels []*Channel, err error) {
 	keyCol := "`key`"
 	if common.UsingPostgreSQL {
 		keyCol = `"key"`
 	}
-	err = DB.Omit("key").Where("id = ? or name LIKE ? or "+keyCol+" = ?", common.String2Int(keyword), keyword+"%", keyword).Find(&channels).Error
+	if group != "" {
+		groupCol := "`group`"
+		if common.UsingPostgreSQL {
+			groupCol = `"group"`
+		}
+		err = DB.Omit("key").Where("(id = ? or name LIKE ? or "+keyCol+" = ?) and "+groupCol+" LIKE ?", common.String2Int(keyword), keyword+"%", keyword, "%"+group+"%").Find(&channels).Error
+	} else {
+		err = DB.Omit("key").Where("id = ? or name LIKE ? or "+keyCol+" = ?", common.String2Int(keyword), keyword+"%", keyword).Find(&channels).Error
+	}
 	return channels, err
 }
 

@@ -181,7 +181,7 @@ func testAllChannels(notify bool) error {
 	}
 	testAllChannelsRunning = true
 	testAllChannelsLock.Unlock()
-	channels, err := model.GetAllChannels(0, 0, true)
+	channels, err := model.GetAllChannels(0, 0, true, false)
 	if err != nil {
 		return err
 	}
@@ -197,16 +197,25 @@ func testAllChannels(notify bool) error {
 			err, openaiErr := testChannel(channel, *testRequest)
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
-			if isChannelEnabled && milliseconds > disableThreshold {
-				err = errors.New(fmt.Sprintf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0))
-				disableChannel(channel.Id, channel.Name, err.Error())
+			ban := true
+
+			// parse *int to bool
+			if channel.AutoBan != nil && *channel.AutoBan == 0 {
+				ban = false
 			}
-			if isChannelEnabled && shouldDisableChannel(openaiErr, -1) {
-				disableChannel(channel.Id, channel.Name, err.Error())
+			if ban {
+				if isChannelEnabled && milliseconds > disableThreshold {
+					err = errors.New(fmt.Sprintf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0))
+					disableChannel(channel.Id, channel.Name, err.Error())
+				}
+				if isChannelEnabled && shouldDisableChannel(openaiErr, -1) {
+					disableChannel(channel.Id, channel.Name, err.Error())
+				}
 			}
 			if !isChannelEnabled && shouldEnableChannel(err, openaiErr) {
 				enableChannel(channel.Id, channel.Name)
 			}
+
 			channel.UpdateResponseTime(milliseconds)
 			time.Sleep(common.RequestInterval)
 		}

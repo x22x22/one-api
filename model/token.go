@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"gorm.io/gorm"
 	"one-api/common"
+	"strconv"
+	"strings"
 )
 
 type Token struct {
@@ -28,8 +30,11 @@ func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	return tokens, err
 }
 
-func SearchUserTokens(userId int, keyword string) (tokens []*Token, err error) {
-	err = DB.Where("user_id = ?", userId).Where("name LIKE ?", keyword+"%").Find(&tokens).Error
+func SearchUserTokens(userId int, keyword string, token string) (tokens []*Token, err error) {
+	if token != "" {
+		token = strings.Trim(token, "sk-")
+	}
+	err = DB.Where("user_id = ?", userId).Where("name LIKE ?", "%"+keyword+"%").Where("`key` LIKE ?", "%"+token+"%").Find(&tokens).Error
 	return tokens, err
 }
 
@@ -224,8 +229,9 @@ func PreConsumeTokenQuota(tokenId int, quota int) (err error) {
 	return err
 }
 
-func PostConsumeTokenQuota(tokenId int, quota int) (err error) {
+func PostConsumeTokenQuota(tokenId int, userQuota int, quota int, preConsumedQuota int, sendEmail bool) (err error) {
 	token, err := GetTokenById(tokenId)
+
 	if quota > 0 {
 		err = DecreaseUserQuota(token.UserId, quota)
 	} else {
@@ -234,6 +240,7 @@ func PostConsumeTokenQuota(tokenId int, quota int) (err error) {
 	if err != nil {
 		return err
 	}
+
 	if !token.UnlimitedQuota {
 		if quota > 0 {
 			err = DecreaseTokenQuota(tokenId, quota)
@@ -244,5 +251,34 @@ func PostConsumeTokenQuota(tokenId int, quota int) (err error) {
 			return err
 		}
 	}
+
+	if sendEmail {
+		if (quota + preConsumedQuota) != 0 {
+			quotaTooLow := userQuota >= common.QuotaRemindThreshold && userQuota-(quota+preConsumedQuota) < common.QuotaRemindThreshold
+			noMoreQuota := userQuota-(quota+preConsumedQuota) <= 0
+			if quotaTooLow || noMoreQuota {
+				go func() {
+					email, err := GetUserEmail(token.UserId)
+					if err != nil {
+						common.SysError("failed to fetch user email: " + err.Error())
+					}
+					prompt := "您的额度即将用尽"
+					if noMoreQuota {
+						prompt = "您的额度已用尽"
+					}
+					if email != "" {
+						topUpLink := fmt.Sprintf("%s/topup", common.ServerAddress)
+						err = common.SendEmail(prompt, email,
+							fmt.Sprintf("%s，当前剩余额度为 %d，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='%s'>%s</a>", prompt, userQuota, topUpLink, topUpLink))
+						if err != nil {
+							common.SysError("failed to send email" + err.Error())
+						}
+						common.SysLog("user quota is low, consumed quota: " + strconv.Itoa(quota) + ", user quota: " + strconv.Itoa(userQuota))
+					}
+				}()
+			}
+		}
+	}
+
 	return nil
 }

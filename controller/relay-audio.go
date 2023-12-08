@@ -151,7 +151,7 @@ func relayAudioHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode 
 			defer func(ctx context.Context) {
 				go func() {
 					// negative means add quota back for token & user
-					err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
+					err := model.PostConsumeTokenQuota(tokenId, userQuota, -preConsumedQuota, preConsumedQuota, true)
 					if err != nil {
 						common.LogError(ctx, fmt.Sprintf("error rollback pre-consumed quota: %s", err.Error()))
 					}

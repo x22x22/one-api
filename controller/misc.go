@@ -26,12 +26,14 @@ func GetStatus(c *gin.Context) {
 			"wechat_qrcode":       common.WeChatAccountQRCodeImageURL,
 			"wechat_login":        common.WeChatAuthEnabled,
 			"server_address":      common.ServerAddress,
+			"price":               common.Price,
 			"turnstile_check":     common.TurnstileCheckEnabled,
 			"turnstile_site_key":  common.TurnstileSiteKey,
 			"top_up_link":         common.TopUpLink,
 			"chat_link":           common.ChatLink,
 			"quota_per_unit":      common.QuotaPerUnit,
 			"display_in_currency": common.DisplayInCurrencyEnabled,
+			"enable_batch_update": common.BatchUpdateEnabled,
 		},
 	})
 	return

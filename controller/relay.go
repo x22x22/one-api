@@ -280,9 +280,10 @@ func Relay(c *gin.Context) {
 	if err != nil {
 		requestId := c.GetString(common.RequestIdKey)
 		channelId := c.GetInt("channel_id")
+		autoBan := c.GetBool("auto_ban")
 		common.LogError(c.Request.Context(), fmt.Sprintf("relay error (channel #%d): %s", channelId, err.Message))
 		// https://platform.openai.com/docs/guides/error-codes/api-errors
-		if shouldDisableChannel(&err.OpenAIError, err.StatusCode) {
+		if shouldDisableChannel(&err.OpenAIError, err.StatusCode) && autoBan {
 			channelId := c.GetInt("channel_id")
 			channelName := c.GetString("channel_name")
 			disableChannel(channelId, channelName, err.Message)

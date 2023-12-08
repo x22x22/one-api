@@ -1,4 +1,5 @@
 import { Label } from 'semantic-ui-react';
+import {Tag} from "@douyinfe/semi-ui";
 
 export function renderText(text, limit) {
   if (text.length > limit) {
@@ -9,18 +10,22 @@ export function renderText(text, limit) {
 
 export function renderGroup(group) {
   if (group === '') {
-    return <Label>default</Label>;
+    return <Tag size='large'>default</Tag>;
   }
   let groups = group.split(',');
   groups.sort();
   return <>
     {groups.map((group) => {
       if (group === 'vip' || group === 'pro') {
-        return <Label color='yellow'>{group}</Label>;
+        return <Tag size='large' color='yellow'>{group}</Tag>;
       } else if (group === 'svip' || group === 'premium') {
-        return <Label color='red'>{group}</Label>;
+        return <Tag size='large' color='red'>{group}</Tag>;
       }
-      return <Label>{group}</Label>;
+      if (group === 'default') {
+        return <Tag size='large'>{group}</Tag>;
+      } else {
+        return <Tag size='large' color={stringToColor(group)}>{group}</Tag>;
+      }
     })}
   </>;
 }
@@ -35,6 +40,12 @@ export function renderNumber(num) {
   } else {
     return num;
   }
+}
+
+export function getQuotaPerUnit() {
+  let quotaPerUnit = localStorage.getItem('quota_per_unit');
+  quotaPerUnit = parseFloat(quotaPerUnit);
+  return quotaPerUnit;
 }
 
 export function renderQuota(quota, digits = 2) {
@@ -55,4 +66,21 @@ export function renderQuotaWithPrompt(quota, digits) {
     return `（等价金额：${renderQuota(quota, digits)}）`;
   }
   return '';
+}
+
+const colors = ['amber', 'blue', 'cyan', 'green', 'grey', 'indigo',
+  'light-blue', 'lime', 'orange', 'pink',
+  'purple', 'red', 'teal', 'violet', 'yellow'
+]
+
+export function stringToColor(str) {
+  let sum = 0;
+  // 对字符串中的每个字符进行操作
+  for (let i = 0; i < str.length; i++) {
+    // 将字符的ASCII值加到sum中
+    sum += str.charCodeAt(i);
+  }
+  // 使用模运算得到个位数
+  let i = sum % colors.length;
+  return colors[i];
 }

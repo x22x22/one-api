@@ -447,7 +447,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			if preConsumedQuota != 0 {
 				go func(ctx context.Context) {
 					// return pre-consumed quota
-					err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
+					err = model.PostConsumeTokenQuota(tokenId, userQuota, -preConsumedQuota, preConsumedQuota, true)
 					if err != nil {
 						common.LogError(ctx, "error return pre-consumed quota: "+err.Error())
 					}
@@ -478,7 +478,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 				quota = 0
 			}
 			quotaDelta := quota - preConsumedQuota
-			err := model.PostConsumeTokenQuota(tokenId, quotaDelta)
+			err = model.PostConsumeTokenQuota(tokenId, userQuota, quotaDelta, preConsumedQuota, true)
 			if err != nil {
 				common.LogError(ctx, "error consuming token remain quota: "+err.Error())
 			}
@@ -488,7 +488,7 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 			}
 			if quota != 0 {
 				logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f", modelRatio, groupRatio)
-				model.RecordConsumeLog(ctx, userId, channelId, promptTokens, completionTokens, textRequest.Model, tokenName, quota, logContent)
+				model.RecordConsumeLog(ctx, userId, channelId, promptTokens, completionTokens, textRequest.Model, tokenName, quota, logContent, tokenId, userQuota)
 				model.UpdateUserUsedQuotaAndRequestCount(userId, quota)
 				model.UpdateChannelUsedQuota(channelId, quota)
 			}

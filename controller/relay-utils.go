@@ -9,6 +9,7 @@ import (
 	"one-api/model"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkoukk/tiktoken-go"
@@ -111,6 +112,14 @@ func countTokenInput(input any, model string) int {
 	return 0
 }
 
+func countAudioToken(text string, model string) int {
+	if strings.HasPrefix(model, "tts") {
+		return utf8.RuneCountInString(text)
+	} else {
+		return countTokenText(text, model)
+	}
+}
+
 func countTokenText(text string, model string) int {
 	tokenEncoder := getTokenEncoder(model)
 	return getTokenNum(tokenEncoder, text)
@@ -208,7 +217,8 @@ func getFullRequestURL(baseURL string, requestURL string, channelType int) strin
 
 func postConsumeQuota(ctx context.Context, tokenId int, quotaDelta int, totalQuota int, userId int, channelId int, modelRatio float64, groupRatio float64, modelName string, tokenName string) {
 	// quotaDelta is remaining quota to be consumed
-	err := model.PostConsumeTokenQuota(tokenId, quotaDelta)
+	userQuota, err := model.CacheGetUserQuota(userId)
+	err = model.PostConsumeTokenQuota(tokenId, userQuota, quotaDelta, 0, true)
 	if err != nil {
 		common.SysError("error consuming token remain quota: " + err.Error())
 	}
@@ -219,7 +229,7 @@ func postConsumeQuota(ctx context.Context, tokenId int, quotaDelta int, totalQuo
 	// totalQuota is total quota consumed
 	if totalQuota != 0 {
 		logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f", modelRatio, groupRatio)
-		model.RecordConsumeLog(ctx, userId, channelId, totalQuota, 0, modelName, tokenName, totalQuota, logContent)
+		model.RecordConsumeLog(ctx, userId, channelId, 0, 0, modelName, tokenName, totalQuota, logContent, tokenId, userQuota)
 		model.UpdateUserUsedQuotaAndRequestCount(userId, totalQuota)
 		model.UpdateChannelUsedQuota(channelId, totalQuota)
 	}

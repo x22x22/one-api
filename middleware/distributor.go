@@ -82,6 +82,12 @@ func Distribute() func(c *gin.Context) {
 				return
 			}
 		}
+		ban := true
+		// parse *int to bool
+		if channel.AutoBan != nil && *channel.AutoBan == 0 {
+			ban = false
+		}
+		c.Set("auto_ban", ban)
 		c.Set("channel", channel.Type)
 		c.Set("channel_id", channel.Id)
 		c.Set("channel_name", channel.Name)

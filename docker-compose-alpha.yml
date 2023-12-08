@@ -48,6 +48,7 @@ services:
     image: nginx:alpine
     ports:
       - "4001:80"
+      - "18899:18899"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     depends_on:

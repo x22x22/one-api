@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/base64"
 	"github.com/google/uuid"
@@ -127,38 +126,27 @@ func asyncHTTPDoWithOpenaiWeb(req *http.Request, isStream bool) (*http.Response,
 func HandlerWithClose(pw *io.PipeWriter, response *http.Response, id string, model string) (string, *ContinueInfo) {
 	maxTokens := false
 
-	// Create a bufio.Reader from the response body
-	reader := bufio.NewReader(response.Body)
-
-	defer func() {
-		err := response.Body.Close()
-		if err != nil {
-			return
-		}
-	}()
+	eventStreamReader := NewEventStreamReader(response.Body.(io.Reader), 40960)
+	defer response.Body.Close()
 
 	var finishReason string
 	var previousText StringStruct
 	var originalResponse ChatGPTResponse
 	var isRole = true
 	for {
-		line, err := reader.ReadString('\n')
+		data, err := eventStreamReader.ReadEvent()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return "", nil
+			break
 		}
-		if len(line) < 6 {
-			continue
+		event, err := processEvent(data)
+		if err != nil {
+			break
 		}
-		// Remove "data: " from the beginning of the line
-		line = line[6:]
 		// Check if line starts with [DONE]
-		if !strings.HasPrefix(line, "[DONE]") {
+		if !bytes.HasPrefix(event.Data, []byte("[DONE]")) {
 			// Parse the line as JSON
 
-			err = json.Unmarshal([]byte(line), &originalResponse)
+			err = json.Unmarshal([]byte(event.Data), &originalResponse)
 			if err != nil {
 				continue
 			}

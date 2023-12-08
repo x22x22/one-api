@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bufio"
 	"bytes"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -18,20 +17,8 @@ type PreData struct {
 
 func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*OpenAIErrorWithStatusCode, string) {
 	responseText := ""
-	scanner := bufio.NewScanner(resp.Body)
+	eventStreamReader := NewEventStreamReader(resp.Body.(io.Reader), 40960)
 	defer resp.Body.Close()
-	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		if atEOF && len(data) == 0 {
-			return 0, nil, nil
-		}
-		if i := strings.Index(string(data), "\n"); i >= 0 {
-			return i + 1, data[0:i], nil
-		}
-		if atEOF {
-			return len(data), data, nil
-		}
-		return 0, nil, nil
-	})
 	dataChan := make(chan string)
 	stopChan := make(chan bool)
 	ticker := time.NewTicker(5 * time.Second)
@@ -39,24 +26,26 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 	go func() {
 		defer close(dataChan) // 确保 dataChan 会被关闭
 		defer close(stopChan) // 确保 stopChan 会被关闭
-		for scanner.Scan() {
-			data := scanner.Text()
-			if len(data) < 6 { // ignore blank line or wrong format
-				continue
-			}
-			event, err := processEvent([]byte(data))
+
+		for {
+			data, err := eventStreamReader.ReadEvent()
 			if err != nil {
-				return
+				break
+			}
+
+			event, err := processEvent(data)
+			if err != nil {
+				break
 			}
 			dataChan <- string(event.Data)
-			data = strings.TrimPrefix(string(event.Data), " ")
-			if !strings.HasPrefix(data, "[DONE]") && len(data) > 1 {
+
+			if !bytes.HasPrefix(event.Data, []byte("[DONE]")) && len(event.Data) > 1 {
 				switch relayMode {
 				case RelayModeChatCompletions:
 					var streamResponse ChatCompletionsStreamResponse
-					err := json.Unmarshal([]byte(data), &streamResponse)
+					err := json.Unmarshal(event.Data, &streamResponse)
 					if err != nil {
-						common.SysError(data)
+						common.SysError(string(event.Data))
 						common.SysError("error unmarshalling stream response: " + err.Error())
 						continue // just ignore the error
 					}
@@ -65,7 +54,7 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 					}
 				case RelayModeCompletions:
 					var streamResponse CompletionsStreamResponse
-					err := json.Unmarshal([]byte(data), &streamResponse)
+					err := json.Unmarshal(event.Data, &streamResponse)
 					if err != nil {
 						common.SysError("error unmarshalling stream response: " + err.Error())
 						continue

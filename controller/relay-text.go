@@ -761,6 +761,7 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 
 	go func() {
 		wg.Wait()
+		timer.Stop()
 		close(done)
 		close(respCh)
 		close(errCh)
@@ -810,7 +811,6 @@ func asyncHTTPDo(req *http.Request, asyncNum int) (*http.Response, error) {
 				}()
 			}
 		case <-done:
-			timer.Stop()
 			mux.Lock()
 			for _, cancel := range cancelFuncs {
 				cancel()

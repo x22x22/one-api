@@ -33,7 +33,8 @@ func openaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*O
 				if err == io.EOF {
 					break
 				}
-				continue
+				common.SysError(err.Error())
+				break
 			}
 
 			event, err := processEvent(data)

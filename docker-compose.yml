@@ -1,6 +1,15 @@
 version: '3.7'
 
 services:
+  lb:
+    image: nginx:alpine
+    ports:
+      - "4000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - one-api
+      - one-api-slave
   one-api:
     image: ahhhliu/one-api:latest
     restart: always
@@ -8,7 +17,7 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
-      - "4000:3000"
+      - "4001:3000"
       - "8899:8899"
     volumes:
       - ./data:/data
@@ -31,7 +40,7 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
-      - "4001:3000"
+      - "4002:3000"
       - "18899:8899"
     volumes:
       - ./data:/data
@@ -51,15 +60,6 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-  lb:
-    image: nginx:alpine
-    ports:
-      - "4002:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-    depends_on:
-        - one-api
-        - one-api-slave
   redis:
     image: redis:latest
     restart: always

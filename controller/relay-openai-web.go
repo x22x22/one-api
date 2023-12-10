@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"one-api/common"
 	"regexp"
 	"strings"
 	"time"
@@ -139,7 +140,8 @@ func HandlerWithClose(pw *io.PipeWriter, response *http.Response, id string, mod
 			if err == io.EOF {
 				break
 			}
-			continue
+			common.SysError(err.Error())
+			break
 		}
 		event, err := processEvent(data)
 		if err != nil {

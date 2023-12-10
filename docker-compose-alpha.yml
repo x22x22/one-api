@@ -5,6 +5,8 @@ services:
     image: ahhhliu/one-api:alpha
     restart: always
     command: --log-dir /app/logs
+    extra_hosts:
+      - host.docker.internal:host-gateway
     ports:
       - "4000:3000"
       - "8899:8899"
@@ -21,11 +23,16 @@ services:
     deploy:
       resources:
         limits:
-          memory: 200M
+          memory: 300M
   one-api-slave:
     image: ahhhliu/one-api:alpha
     restart: always
     command: --log-dir /app/logs
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "4001:3000"
+      - "18899:8899"
     volumes:
       - ./data:/data
       - ./logs:/app/logs
@@ -40,20 +47,19 @@ services:
     deploy:
       resources:
         limits:
-          memory: 150M
-      replicas: 2
+          memory: 250M
+      replicas: 1
       restart_policy:
         condition: on-failure
   lb:
     image: nginx:alpine
     ports:
-      - "4001:80"
-      - "18899:18899"
+      - "4002:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     depends_on:
-        - one-api
-        - one-api-slave
+      - one-api
+      - one-api-slave
   redis:
     image: redis:latest
     restart: always

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,6 +19,8 @@ var (
 	UserId2GroupCacheSeconds  = common.SyncFrequency
 	UserId2QuotaCacheSeconds  = common.SyncFrequency
 	UserId2StatusCacheSeconds = common.SyncFrequency
+	redisClient               = common.RDB
+	ctx                       = context.Background()
 )
 
 func CacheGetTokenByKey(key string) (*Token, error) {
@@ -135,34 +139,48 @@ var group2model2channels map[string]map[string][]*Channel
 var channelSyncLock sync.RWMutex
 
 func InitChannelCache() {
-	newChannelId2channel := make(map[int]*Channel)
 	var channels []*Channel
-	DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels)
+	startTime := time.Now()
+	common.SysLog("start syncing channels from database")
+	channels, err := GetEnableChannels()
+	if err != nil {
+		return
+	}
+	newChannelId2channel := make(map[int]*Channel)
+
+	modelsCache := make(map[string][]string)
+	groupsCache := make(map[string][]string)
+
+	newGroup2model2channels := make(map[string]map[string][]*Channel)
+
 	for _, channel := range channels {
 		newChannelId2channel[channel.Id] = channel
-	}
-	var abilities []*Ability = GenAbilitiesByChannels(channels)
-	//DB.Find(&abilities)
-	groups := make(map[string]bool)
-	for _, ability := range abilities {
-		groups[ability.Group] = true
-	}
-	newGroup2model2channels := make(map[string]map[string][]*Channel)
-	for group := range groups {
-		newGroup2model2channels[group] = make(map[string][]*Channel)
-	}
-	for _, channel := range channels {
-		groups := strings.Split(channel.Group, ",")
-		for _, group := range groups {
-			models := strings.Split(channel.Models, ",")
-			for _, model := range models {
+		models_, ok := modelsCache[channel.Models]
+		if !ok {
+			models_ = strings.Split(channel.Models, ",")
+			modelsCache[channel.Models] = models_
+		}
+
+		groups_, ok := groupsCache[channel.Group]
+		if !ok {
+			groups_ = strings.Split(channel.Group, ",")
+			groupsCache[channel.Group] = groups_
+		}
+
+		for _, group := range groups_ {
+			if newGroup2model2channels[group] == nil {
+				newGroup2model2channels[group] = make(map[string][]*Channel)
+			}
+			for _, model := range models_ {
 				if _, ok := newGroup2model2channels[group][model]; !ok {
-					newGroup2model2channels[group][model] = make([]*Channel, 0)
+					newGroup2model2channels[group][model] = make([]*Channel, 0, len(models_))
 				}
 				newGroup2model2channels[group][model] = append(newGroup2model2channels[group][model], channel)
 			}
 		}
 	}
+
+	common.SysLog("channels synced from database, took " + time.Since(startTime).String())
 
 	// sort by priority
 	for group, model2channels := range newGroup2model2channels {
@@ -214,26 +232,50 @@ func CacheGetRandomSatisfiedChannel(group string, model string) (*Channel, error
 }
 
 func UpdateAllAbilities() error {
-	channelSyncLock.Lock()
-	defer channelSyncLock.Unlock()
-	channels := make([]*Channel, 0)
-	err := DB.Find(&channels).Error
-	if err != nil {
-		return err
-	}
-	abilities := GenAbilitiesByChannels(channels)
-	err = DB.Where("1 = 1").Delete(&Ability{}).Error
-	if err != nil {
-		return err
-	}
-	return DB.CreateInBatches(&abilities, 40).Error
+	//channelSyncLock.Lock()
+	//defer channelSyncLock.Unlock()
+	//channels := make([]*Channel, 0)
+	//err := DB.Find(&channels).Error
+	//if err != nil {
+	//	return err
+	//}
+	//abilities := GenAbilitiesByChannels(channels)
+	//err = DB.Where("1 = 1").Delete(&Ability{}).Error
+	//if err != nil {
+	//	return err
+	//}
+	//return DB.CreateInBatches(&abilities, 40).Error
+	return nil
 }
 
 func GenAbilitiesByChannels(channels []*Channel) []*Ability {
-	abilities := make([]*Ability, 0)
+	modelsCache := make(map[string][]string)
+	groupsCache := make(map[string][]string)
+	totalAbilities := 0
 	for _, channel := range channels {
-		models_ := strings.Split(channel.Models, ",")
-		groups_ := strings.Split(channel.Group, ",")
+		models, ok := modelsCache[channel.Models]
+		if !ok {
+			models = strings.Split(channel.Models, ",")
+			modelsCache[channel.Models] = models
+		}
+
+		groups, ok := groupsCache[channel.Group]
+		if !ok {
+			groups = strings.Split(channel.Group, ",")
+			groupsCache[channel.Group] = groups
+		}
+		totalAbilities += len(models) * len(groups)
+	}
+
+	abilities := make([]*Ability, totalAbilities)
+	var index int64 = -1
+	for _, channel := range channels {
+		models_, modelsOk := modelsCache[channel.Models]
+		groups_, groupsOk := groupsCache[channel.Group]
+		if !modelsOk || !groupsOk {
+			// 这里可以添加错误处理逻辑
+			continue
+		}
 		for _, model := range models_ {
 			for _, group := range groups_ {
 				ability := &Ability{
@@ -243,9 +285,46 @@ func GenAbilitiesByChannels(channels []*Channel) []*Ability {
 					Enabled:   channel.Status == common.ChannelStatusEnabled,
 					Priority:  channel.Priority,
 				}
-				abilities = append(abilities, ability)
+				idx := atomic.AddInt64(&index, 1)
+				abilities[idx] = ability
 			}
 		}
 	}
 	return abilities
+}
+
+func GenAbilitiesByChannelsWithChan(channels []*Channel) chan *Ability {
+	// 返回 chan 的方式，可以避免内存占用过大
+	abilityCh := make(chan *Ability, 200)
+	go func(channels []*Channel) {
+		defer close(abilityCh)
+		modelsCache := make(map[string][]string)
+		groupsCache := make(map[string][]string)
+		for _, channel := range channels {
+			models_, ok := modelsCache[channel.Models]
+			if !ok {
+				models_ = strings.Split(channel.Models, ",")
+				modelsCache[channel.Models] = models_
+			}
+
+			groups_, ok := groupsCache[channel.Group]
+			if !ok {
+				groups_ = strings.Split(channel.Group, ",")
+				groupsCache[channel.Group] = groups_
+			}
+			for _, model := range models_ {
+				for _, group := range groups_ {
+					ability := &Ability{
+						Group:     group,
+						Model:     model,
+						ChannelId: channel.Id,
+						Enabled:   channel.Status == common.ChannelStatusEnabled,
+						Priority:  channel.Priority,
+					}
+					abilityCh <- ability
+				}
+			}
+		}
+	}(channels)
+	return abilityCh
 }

@@ -1,8 +1,10 @@
 package model
 
 import (
+	"context"
 	"gorm.io/gorm"
 	"one-api/common"
+	"time"
 )
 
 type Channel struct {
@@ -27,6 +29,51 @@ type Channel struct {
 	ModelMapping       *string `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
 	Priority           *int64  `json:"priority" gorm:"bigint;default:0"`
 	AutoBan            *int    `json:"auto_ban" gorm:"default:1"`
+}
+
+func GetEnableChannels() ([]*Channel, error) {
+	startTime := time.Now()
+	defer func() {
+		common.SysLog("get enable channels took " + time.Since(startTime).String())
+	}()
+
+	if !common.RedisEnabled {
+		var channels []*Channel
+		err := DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error
+		return channels, err
+	}
+	var ctx = context.Background()
+	// 从Redis中获取
+	val, err := common.RDB.LRange(ctx, "channel:enable:list", 0, -1).Result()
+	if err != nil || len(val) == 0 {
+		// 缓存中不存在，从数据库加载并更新缓存
+		var channels []*Channel
+		err = DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error
+		if err != nil {
+			return nil, err
+		}
+		// 序列化channels并保存到Redis
+		for _, channel := range channels {
+			channelData, err := json.Marshal(channel)
+			if err != nil {
+				return nil, err
+			}
+			common.RDB.LPush(ctx, "channel:enable:list", channelData)
+		}
+		common.RDB.Expire(ctx, "channel:enable:list", 150*time.Second)
+		return channels, nil
+	}
+
+	channels := make([]*Channel, len(val))
+	for i, jsonData := range val {
+		var channel Channel
+		err = json.Unmarshal([]byte(jsonData), &channel)
+		if err != nil {
+			return nil, err
+		}
+		channels[i] = &channel
+	}
+	return channels, nil
 }
 
 func GetAllChannels(startIdx int, num int, selectAll bool, idSort bool) ([]*Channel, error) {

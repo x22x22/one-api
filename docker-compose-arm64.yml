@@ -1,24 +1,13 @@
 version: '3.7'
 
 services:
-  lb:
-    image: nginx:alpine
-    ports:
-      - "4000:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-    depends_on:
-      - one-api
-      - one-api-slave
   one-api:
-    image: ahhhliu/one-api:alpha
-    platform: "linux/amd64"
+    image: ahhhliu/one-api:latest-linux-arm64
+    platform: "linux/arm64"
     restart: always
     command: --log-dir /app/logs
-    extra_hosts:
-      - host.docker.internal:host-gateway
     ports:
-      - "4001:3000"
+      - "4000:3000"
       - "8899:8899"
     volumes:
       - ./data:/data
@@ -33,17 +22,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 300M
+          memory: 200M
   one-api-slave:
-    image: ahhhliu/one-api:alpha
-    platform: "linux/amd64"
+    image: ahhhliu/one-api:latest-arm64
     restart: always
     command: --log-dir /app/logs
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    ports:
-      - "4002:3000"
-      - "18899:8899"
     volumes:
       - ./data:/data
       - ./logs:/app/logs
@@ -58,16 +41,25 @@ services:
     deploy:
       resources:
         limits:
-          memory: 250M
-      replicas: 1
+          memory: 150M
+      replicas: 2
       restart_policy:
         condition: on-failure
+  lb:
+    image: nginx:alpine
+    ports:
+      - "4001:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - one-api
+      - one-api-slave
   redis:
     image: redis:latest
     restart: always
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 --cleanup
-    restart: unless-stopped
+#  watchtower:
+#    image: containrrr/watchtower
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    command: --interval 3600 --cleanup
+#    restart: unless-stopped

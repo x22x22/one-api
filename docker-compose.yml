@@ -11,7 +11,8 @@ services:
       - one-api
       - one-api-slave
   one-api:
-    image: ahhhliu/one-api:latest
+    image: ahhhliu/one-api:latest-amd64
+    platform: "linux/amd64"
     restart: always
     command: --log-dir /app/logs
     extra_hosts:
@@ -34,7 +35,8 @@ services:
         limits:
           memory: 300M
   one-api-slave:
-    image: ahhhliu/one-api:latest
+    image: ahhhliu/one-api:latest-amd64
+    platform: "linux/amd64"
     restart: always
     command: --log-dir /app/logs
     extra_hosts:

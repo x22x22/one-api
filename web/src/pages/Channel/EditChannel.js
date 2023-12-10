@@ -49,7 +49,6 @@ const EditChannel = (props) => {
     };
     const [batch, setBatch] = useState(false);
     const [autoBan, setAutoBan] = useState(true);
-    // const [autoBan, setAutoBan] = useState(true);
     const [inputs, setInputs] = useState(originInputs);
     const [originModelOptions, setOriginModelOptions] = useState([]);
     const [modelOptions, setModelOptions] = useState([]);
@@ -523,8 +522,8 @@ const EditChannel = (props) => {
                                 checked={autoBan}
                                 onChange={
                                     () => {
+                                        handleInputChange('auto_ban', autoBan ? 0 : 1)
                                         setAutoBan(!autoBan);
-
                                     }
                                 }
                                 // onChange={handleInputChange}

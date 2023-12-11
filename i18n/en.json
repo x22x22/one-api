@@ -524,7 +524,6 @@
   "删除个人账户": "Delete personal account",
   "重新发送": "Resend ",
   "确认删除自己的帐户": "Confirm deletion of your own account",
-  "输入你的账户名": "Enter your account name",
   "以确认删除": "to confirm deletion",
   "重试": "Retry",
   "无法复制到剪贴板，请手动复制，已将兑换码填入搜索框。": "Unable to copy to clipboard, please copy manually, the redemption code has been filled in the search box.",
@@ -671,6 +670,9 @@
 
   "管理你的 Discord OAuth App": "{' '}to manage your Discord OAuth App",
   "管理你的 Google OAuth App": "{' '}to manage your Google OAuth App",
+
+  "插件参数": "Plugin parameters",
+  "请输入插件参数，即 X-DashScope-Plugin 请求头的取值": "Please enter the plugin parameters, that is, the value of the X-DashScope-Plugin request header",
 
   "删除禁用渠道": "Delete disabled channel",
   "注意，此处生成的令牌用于系统管理，而非用于请求 OpenAI 相关的服务，请知悉。": "Please note that the tokens generated here are for system administration and not for requesting services related to OpenAI. Please be aware."

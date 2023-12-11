@@ -2,7 +2,7 @@ version: '3.7'
 
 services:
   one-api:
-    image: ahhhliu/one-api:latest-linux-arm64
+    image: ahhhliu/one-api:latest-arm64
     platform: "linux/arm64"
     restart: always
     command: --log-dir /app/logs

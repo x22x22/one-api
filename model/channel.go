@@ -54,10 +54,7 @@ func GetEnableChannels() ([]*Channel, error) {
 		}
 		// 序列化channels并保存到Redis
 		for _, channel := range channels {
-			channelData, err := json.Marshal(channel)
-			if err != nil {
-				return nil, err
-			}
+			channelData, _ := json.Marshal(channel)
 			common.RDB.LPush(ctx, "channel:enable:list", channelData)
 		}
 		common.RDB.Expire(ctx, "channel:enable:list", 150*time.Second)
@@ -69,7 +66,7 @@ func GetEnableChannels() ([]*Channel, error) {
 		var channel Channel
 		err = json.Unmarshal([]byte(jsonData), &channel)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		channels[i] = &channel
 	}

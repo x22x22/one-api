@@ -38,29 +38,34 @@ func GetEnableChannels() ([]*Channel, error) {
 	}()
 
 	if !common.RedisEnabled {
-		var channels []*Channel
-		err := DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error
-		return channels, err
+		return readChannelsFromDB()
 	}
 	var ctx = context.Background()
+	// 分布式锁的键
+	lockKey := "channel:enable:list:lock"
+	// 尝试获取分布式锁
+	lockSuccess, err := common.RDB.SetNX(ctx, lockKey, "1", 5*time.Second).Result()
+	if err != nil {
+		// 发生错误时直接从数据库读取
+		return readChannelsFromDB()
+	}
+	if !lockSuccess {
+		// 获取锁失败时直接从数据库读取
+		return readChannelsFromDB()
+	}
+	defer func() {
+		// 释放锁
+		common.RDB.Del(ctx, lockKey)
+	}()
+
 	// 从Redis中获取
 	val, err := common.RDB.LRange(ctx, "channel:enable:list", 0, -1).Result()
 	if err != nil || len(val) == 0 {
 		// 缓存中不存在，从数据库加载并更新缓存
-		var channels []*Channel
-		err = DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error
-		if err != nil {
-			return nil, err
-		}
-		// 序列化channels并保存到Redis
-		for _, channel := range channels {
-			channelData, _ := json.Marshal(channel)
-			common.RDB.LPush(ctx, "channel:enable:list", channelData)
-		}
-		common.RDB.Expire(ctx, "channel:enable:list", 150*time.Second)
-		return channels, nil
+		return readAndCacheChannels(ctx)
 	}
 
+	// 解析从缓存中获取的数据
 	channels := make([]*Channel, len(val))
 	for i, jsonData := range val {
 		var channel Channel
@@ -70,6 +75,27 @@ func GetEnableChannels() ([]*Channel, error) {
 		}
 		channels[i] = &channel
 	}
+	return channels, nil
+}
+
+func readChannelsFromDB() ([]*Channel, error) {
+	var channels []*Channel
+	err := DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error
+	return channels, err
+}
+
+func readAndCacheChannels(ctx context.Context) ([]*Channel, error) {
+	var channels []*Channel
+	err := DB.Where("status = ?", common.ChannelStatusEnabled).Find(&channels).Error
+	if err != nil {
+		return nil, err
+	}
+	// 序列化channels并保存到Redis
+	for _, channel := range channels {
+		channelData, _ := json.Marshal(channel)
+		common.RDB.LPush(ctx, "channel:enable:list", channelData)
+	}
+	common.RDB.Expire(ctx, "channel:enable:list", 150*time.Second)
 	return channels, nil
 }
 

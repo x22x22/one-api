@@ -60,6 +60,7 @@ const EditChannel = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
     if (name === 'type' && inputs.models.length === 0) {
       let localModels = [];
+      let withQwenInternetVersion = [];
       switch (value) {
         case 14:
           localModels = ['claude-instant-1', 'claude-2', 'claude-2.0', 'claude-2.1'];
@@ -72,13 +73,12 @@ const EditChannel = () => {
           break;
         case 17:
           localModels = ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-max-longcontext', 'text-embedding-v1'];
-          let withInternetVersion = [];
           for (let i = 0; i < localModels.length; i++) {
             if (localModels[i].startsWith('qwen-')) {
-              withInternetVersion.push(localModels[i] + '-internet');
+              withQwenInternetVersion.push(localModels[i] + '-internet');
             }
           }
-          localModels = [...localModels, ...withInternetVersion];
+          localModels = [...localModels, ...withQwenInternetVersion];
           break;
         case 16:
           localModels = ['chatglm_turbo', 'chatglm_pro', 'chatglm_std', 'chatglm_lite'];

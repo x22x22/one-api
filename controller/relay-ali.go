@@ -14,20 +14,21 @@ import (
 // https://help.aliyun.com/document_detail/613695.html?spm=a2c4g.2399480.0.0.1adb778fAdzP9w#341800c0f8w0r
 
 type AliMessage struct {
-	User string `json:"user"`
-	Bot  string `json:"bot"`
+	Content string `json:"content"`
+	Role    string `json:"role"`
 }
 
 type AliInput struct {
-	Prompt  string       `json:"prompt"`
-	History []AliMessage `json:"history"`
+	//Prompt   string       `json:"prompt"`
+	Messages []AliMessage `json:"messages"`
 }
 
 type AliParameters struct {
-	TopP         float64 `json:"top_p,omitempty"`
-	TopK         int     `json:"top_k,omitempty"`
-	Seed         uint64  `json:"seed,omitempty"`
-	EnableSearch bool    `json:"enable_search,omitempty"`
+	TopP              float64 `json:"top_p,omitempty"`
+	TopK              int     `json:"top_k,omitempty"`
+	Seed              uint64  `json:"seed,omitempty"`
+	EnableSearch      bool    `json:"enable_search,omitempty"`
+	IncrementalOutput bool    `json:"incremental_output,omitempty"`
 }
 
 type AliChatRequest struct {
@@ -82,41 +83,32 @@ type AliChatResponse struct {
 	AliError
 }
 
+const AliEnableSearchModelSuffix = "-internet"
+
 func requestOpenAI2Ali(request GeneralOpenAIRequest) *AliChatRequest {
 	messages := make([]AliMessage, 0, len(request.Messages))
-	prompt := ""
 	for i := 0; i < len(request.Messages); i++ {
 		message := request.Messages[i]
-		if message.Role == "system" {
-			messages = append(messages, AliMessage{
-				User: message.StringContent(),
-				Bot:  "Okay",
-			})
-			continue
-		} else {
-			if i == len(request.Messages)-1 {
-				prompt = message.StringContent()
-				break
-			}
-			messages = append(messages, AliMessage{
-				User: message.StringContent(),
-				Bot:  request.Messages[i+1].StringContent(),
-			})
-			i++
-		}
+		messages = append(messages, AliMessage{
+			Content: message.StringContent(),
+			Role:    strings.ToLower(message.Role),
+		})
+	}
+	enableSearch := false
+	aliModel := request.Model
+	if strings.HasSuffix(aliModel, AliEnableSearchModelSuffix) {
+		enableSearch = true
+		aliModel = strings.TrimSuffix(aliModel, AliEnableSearchModelSuffix)
 	}
 	return &AliChatRequest{
-		Model: request.Model,
+		Model: aliModel,
 		Input: AliInput{
-			Prompt:  prompt,
-			History: messages,
+			Messages: messages,
 		},
-		//Parameters: AliParameters{  // ChatGPT's parameters are not compatible with Ali's
-		//	TopP: request.TopP,
-		//	TopK: 50,
-		//	//Seed:         0,
-		//	//EnableSearch: false,
-		//},
+		Parameters: AliParameters{
+			EnableSearch:      enableSearch,
+			IncrementalOutput: request.Stream,
+		},
 	}
 }
 
@@ -221,7 +213,7 @@ func streamResponseAli2OpenAI(aliResponse *AliChatResponse) *ChatCompletionsStre
 		Id:      aliResponse.RequestId,
 		Object:  "chat.completion.chunk",
 		Created: common.GetTimestamp(),
-		Model:   "ernie-bot",
+		Model:   "qwen",
 		Choices: []ChatCompletionsStreamResponseChoice{choice},
 	}
 	return &response
@@ -259,7 +251,7 @@ func aliStreamHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorWithStat
 		stopChan <- true
 	}()
 	setEventStreamHeaders(c)
-	lastResponseText := ""
+	//lastResponseText := ""
 	c.Stream(func(w io.Writer) bool {
 		select {
 		case data := <-dataChan:
@@ -275,8 +267,8 @@ func aliStreamHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorWithStat
 				usage.TotalTokens = aliResponse.Usage.InputTokens + aliResponse.Usage.OutputTokens
 			}
 			response := streamResponseAli2OpenAI(&aliResponse)
-			response.Choices[0].Delta.Content = strings.TrimPrefix(response.Choices[0].Delta.Content, lastResponseText)
-			lastResponseText = aliResponse.Output.Text
+			//response.Choices[0].Delta.Content = strings.TrimPrefix(response.Choices[0].Delta.Content, lastResponseText)
+			//lastResponseText = aliResponse.Output.Text
 			jsonResponse, err := json.Marshal(response)
 			if err != nil {
 				common.SysError("error marshalling stream response: " + err.Error())
@@ -322,6 +314,7 @@ func aliHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorWithStatusCode
 		}, nil
 	}
 	fullTextResponse := responseAli2OpenAI(&aliResponse)
+	fullTextResponse.Model = "qwen"
 	jsonResponse, err := json.Marshal(fullTextResponse)
 	if err != nil {
 		return errorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil

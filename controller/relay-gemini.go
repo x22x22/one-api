@@ -211,16 +211,16 @@ func responseGeminiChat2OpenAI(response *GeminiChatResponse) *OpenAITextResponse
 	return &fullTextResponse
 }
 
-func streamResponseGeminiChat2OpenAI(geminiResponse *GeminiChatResponse) *ChatCompletionsStreamResponse {
-	var choice ChatCompletionsStreamResponseChoice
-	choice.Delta.Content = geminiResponse.GetResponseText()
-	choice.FinishReason = &stopFinishReason
-	var response ChatCompletionsStreamResponse
-	response.Object = "chat.completion.chunk"
-	response.Model = "gemini"
-	response.Choices = []ChatCompletionsStreamResponseChoice{choice}
-	return &response
-}
+// func streamResponseGeminiChat2OpenAI(geminiResponse *GeminiChatResponse) *ChatCompletionsStreamResponse {
+// 	var choice ChatCompletionsStreamResponseChoice
+// 	choice.Delta.Content = geminiResponse.GetResponseText()
+// 	choice.FinishReason = &stopFinishReason
+// 	var response ChatCompletionsStreamResponse
+// 	response.Object = "chat.completion.chunk"
+// 	response.Model = "gemini"
+// 	response.Choices = []ChatCompletionsStreamResponseChoice{choice}
+// 	return &response
+// }
 
 func geminiChatStreamHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorWithStatusCode, string) {
 	responseText := ""
@@ -263,6 +263,10 @@ func geminiChatStreamHandler(c *gin.Context, resp *http.Response) (*OpenAIErrorW
 			}
 			var dummy dummyStruct
 			err := json.Unmarshal([]byte(data), &dummy)
+			if err != nil {
+				common.SysError("error unmarshalling stream response: " + err.Error())
+				return true
+			}
 			responseText += dummy.Content
 			var choice ChatCompletionsStreamResponseChoice
 			choice.Delta.Content = dummy.Content
@@ -333,5 +337,8 @@ func geminiChatHandler(c *gin.Context, resp *http.Response, promptTokens int, mo
 	c.Writer.Header().Set("Content-Type", "application/json")
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, err = c.Writer.Write(jsonResponse)
+	if err != nil {
+		return errorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), nil
+	}
 	return nil, &usage
 }

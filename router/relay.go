@@ -17,10 +17,15 @@ func SetRelayRouter(router *gin.Engine) {
 		modelsRouter.GET("/:model", controller.RetrieveModel)
 	}
 	relayV1Router := router.Group("/v1")
+	relayV1LLMRouter := router.Group("/v1")
+	relayV1LLMRouter.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.LLMCache(), middleware.Distribute())
+	{
+		relayV1LLMRouter.POST("/completions", controller.Relay)
+		relayV1LLMRouter.POST("/chat/completions", controller.Relay)
+	}
 	relayV1Router.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.Distribute())
 	{
-		relayV1Router.POST("/completions", controller.Relay)
-		relayV1Router.POST("/chat/completions", controller.Relay)
+
 		relayV1Router.POST("/edits", controller.Relay)
 		relayV1Router.POST("/images/generations", controller.Relay)
 		relayV1Router.POST("/images/edits", controller.RelayNotImplemented)

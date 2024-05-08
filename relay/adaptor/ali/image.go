@@ -9,6 +9,7 @@ import (
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"io"
 	"net/http"
@@ -16,7 +17,7 @@ import (
 	"time"
 )
 
-func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.ErrorWithStatusCode, *model.Usage) {
 	apiKey := c.Request.Header.Get("Authorization")
 	apiKey = strings.TrimPrefix(apiKey, "Bearer ")
 	responseFormat := c.GetString("response_format")
@@ -40,7 +41,7 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 		return openai.ErrorWrapper(errors.New(aliTaskResponse.Message), "ali_async_task_failed", http.StatusInternalServerError), nil
 	}
 
-	aliResponse, _, err := asyncTaskWait(aliTaskResponse.Output.TaskId, apiKey)
+	aliResponse, _, err := asyncTaskWait(aliTaskResponse.Output.TaskId, apiKey, meta)
 	if err != nil {
 		return openai.ErrorWrapper(err, "ali_async_task_wait_failed", http.StatusInternalServerError), nil
 	}
@@ -68,8 +69,8 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 	return nil, nil
 }
 
-func asyncTask(taskID string, key string) (*TaskResponse, error, []byte) {
-	url := fmt.Sprintf("https://dashscope.aliyuncs.com/api/v1/tasks/%s", taskID)
+func asyncTask(taskID string, key string, meta *meta.Meta) (*TaskResponse, error, []byte) {
+	url := fmt.Sprintf("%s/api/v1/tasks/%s", meta.BaseURL, taskID)
 
 	var aliResponse TaskResponse
 
@@ -100,7 +101,7 @@ func asyncTask(taskID string, key string) (*TaskResponse, error, []byte) {
 	return &response, nil, responseBody
 }
 
-func asyncTaskWait(taskID string, key string) (*TaskResponse, []byte, error) {
+func asyncTaskWait(taskID string, key string, meta *meta.Meta) (*TaskResponse, []byte, error) {
 	waitSeconds := 2
 	step := 0
 	maxStep := 20
@@ -110,7 +111,7 @@ func asyncTaskWait(taskID string, key string) (*TaskResponse, []byte, error) {
 
 	for {
 		step++
-		rsp, err, body := asyncTask(taskID, key)
+		rsp, err, body := asyncTask(taskID, key, meta)
 		responseBody = body
 		if err != nil {
 			return &taskResponse, responseBody, err

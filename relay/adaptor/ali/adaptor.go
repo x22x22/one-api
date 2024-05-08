@@ -88,7 +88,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		case relaymode.Embeddings:
 			err, usage = EmbeddingHandler(c, resp)
 		case relaymode.ImagesGenerations:
-			err, usage = ImageHandler(c, resp)
+			err, usage = ImageHandler(c, resp, meta)
 		default:
 			err, usage = Handler(c, resp)
 		}

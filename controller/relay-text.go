@@ -201,9 +201,13 @@ func relayTextHelper(c *gin.Context, relayMode int) *OpenAIErrorWithStatusCode {
 		}
 		fullRequestURL = fmt.Sprintf("https://open.bigmodel.cn/api/paas/v3/model-api/%s/%s", textRequest.Model, method)
 	case APITypeAli:
-		fullRequestURL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+		requestBaseURL := "https://dashscope.aliyuncs.com"
+		if baseURL != "" {
+			requestBaseURL = baseURL
+		}
+		fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/text-generation/generation", requestBaseURL)
 		if relayMode == RelayModeEmbeddings {
-			fullRequestURL = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
+			fullRequestURL = fmt.Sprintf("%s/api/v1/services/embeddings/text-embedding/text-embedding", requestBaseURL)
 		}
 	case APITypeTencent:
 		fullRequestURL = "https://hunyuan.cloud.tencent.com/hyllm/v1/chat/completions"

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -54,6 +55,11 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return openai.ErrorWrapper(err, "get_image_cost_ratio_failed", http.StatusInternalServerError)
 	}
 
+	imageModel := imageRequest.Model
+	// Convert the original image model
+	imageRequest.Model, _ = getMappedModelName(imageRequest.Model, billingratio.ImageOriginModelName)
+	c.Set("response_format", imageRequest.ResponseFormat)
+
 	var requestBody io.Reader
 	if isModelMapped || meta.ChannelType == channeltype.Azure { // make Azure channel request body
 		jsonStr, err := json.Marshal(imageRequest)
@@ -69,6 +75,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	if adaptor == nil {
 		return openai.ErrorWrapper(fmt.Errorf("invalid api type: %d", meta.APIType), "invalid_api_type", http.StatusBadRequest)
 	}
+	adaptor.Init(meta)
 
 	switch meta.ChannelType {
 	case channeltype.Ali:
@@ -87,7 +94,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		requestBody = bytes.NewBuffer(jsonStr)
 	}
 
-	modelRatio := billingratio.GetModelRatio(imageRequest.Model)
+	modelRatio := billingratio.GetModelRatio(imageModel)
 	groupRatio := billingratio.GetGroupRatio(meta.Group)
 	ratio := modelRatio * groupRatio
 	userQuota, err := model.CacheGetUserQuota(ctx, meta.UserId)
@@ -106,9 +113,10 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	}
 
 	defer func(ctx context.Context) {
-		if resp.StatusCode != http.StatusOK {
+		if resp != nil && resp.StatusCode != http.StatusOK {
 			return
 		}
+
 		err := model.PostConsumeTokenQuota(meta.TokenId, quota)
 		if err != nil {
 			logger.SysError("error consuming token remain quota: " + err.Error())
@@ -118,11 +126,11 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			logger.SysError("error update user quota cache: " + err.Error())
 		}
 		if quota != 0 {
-			tokenName := c.GetString("token_name")
+			tokenName := c.GetString(ctxkey.TokenName)
 			logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f", modelRatio, groupRatio)
 			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, 0, 0, imageRequest.Model, tokenName, quota, logContent)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
-			channelId := c.GetInt("channel_id")
+			channelId := c.GetInt(ctxkey.ChannelId)
 			model.UpdateChannelUsedQuota(channelId, quota)
 		}
 	}(c.Request.Context())

@@ -4,6 +4,7 @@ import (
 	"github.com/songquanpeng/one-api/common/env"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,9 +52,9 @@ var EmailDomainWhitelist = []string{
 	"foxmail.com",
 }
 
-var DebugEnabled = os.Getenv("DEBUG") == "true"
-var DebugSQLEnabled = os.Getenv("DEBUG_SQL") == "true"
-var MemoryCacheEnabled = os.Getenv("MEMORY_CACHE_ENABLED") == "true"
+var DebugEnabled = strings.ToLower(os.Getenv("DEBUG")) == "true"
+var DebugSQLEnabled = strings.ToLower(os.Getenv("DEBUG_SQL")) == "true"
+var MemoryCacheEnabled = strings.ToLower(os.Getenv("MEMORY_CACHE_ENABLED")) == "true"
 
 var LogConsumeEnabled = true
 
@@ -116,10 +117,10 @@ var ValidThemes = map[string]bool{
 // All duration's unit is seconds
 // Shouldn't larger then RateLimitKeyExpirationDuration
 var (
-	GlobalApiRateLimitNum            = env.Int("GLOBAL_API_RATE_LIMIT", 180)
+	GlobalApiRateLimitNum            = env.Int("GLOBAL_API_RATE_LIMIT", 240)
 	GlobalApiRateLimitDuration int64 = 3 * 60
 
-	GlobalWebRateLimitNum            = env.Int("GLOBAL_WEB_RATE_LIMIT", 60)
+	GlobalWebRateLimitNum            = env.Int("GLOBAL_WEB_RATE_LIMIT", 120)
 	GlobalWebRateLimitDuration int64 = 3 * 60
 
 	UploadRateLimitNum            = 10
@@ -143,3 +144,7 @@ var MetricFailChanSize = env.Int("METRIC_FAIL_CHAN_SIZE", 128)
 var InitialRootToken = os.Getenv("INITIAL_ROOT_TOKEN")
 
 var GeminiVersion = env.String("GEMINI_VERSION", "v1")
+
+var RelayProxy = env.String("RELAY_PROXY", "")
+var UserContentRequestProxy = env.String("USER_CONTENT_REQUEST_PROXY", "")
+var UserContentRequestTimeout = env.Int("USER_CONTENT_REQUEST_TIMEOUT", 30)

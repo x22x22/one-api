@@ -14,10 +14,11 @@ import (
 
 type Adaptor struct {
 	request *model.GeneralOpenAIRequest
+	meta    *meta.Meta
 }
 
 func (a *Adaptor) Init(meta *meta.Meta) {
-
+	a.meta = meta
 }
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
@@ -60,10 +61,18 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	if a.request == nil {
 		return nil, openai.ErrorWrapper(errors.New("request is nil"), "request_is_nil", http.StatusBadRequest)
 	}
+	version := parseAPIVersionByModelName(meta.ActualModelName)
+	if version == "" {
+		version = a.meta.Config.APIVersion
+	}
+	if version == "" {
+		version = "v1.1"
+	}
+	a.meta.Config.APIVersion = version
 	if meta.IsStream {
-		err, usage = StreamHandler(c, *a.request, splits[0], splits[1], splits[2])
+		err, usage = StreamHandler(c, meta, *a.request, splits[0], splits[1], splits[2])
 	} else {
-		err, usage = Handler(c, *a.request, splits[0], splits[1], splits[2])
+		err, usage = Handler(c, meta, *a.request, splits[0], splits[1], splits[2])
 	}
 	return
 }

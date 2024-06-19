@@ -4,6 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -13,9 +17,6 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
 	"github.com/songquanpeng/one-api/relay/model"
-	"io"
-	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,7 +55,17 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			MaxOutputTokens: textRequest.MaxTokens,
 		},
 	}
-	if textRequest.Functions != nil {
+	if textRequest.Tools != nil {
+		functions := make([]model.Function, 0, len(textRequest.Tools))
+		for _, tool := range textRequest.Tools {
+			functions = append(functions, tool.Function)
+		}
+		geminiRequest.Tools = []ChatTools{
+			{
+				FunctionDeclarations: functions,
+			},
+		}
+	} else if textRequest.Functions != nil {
 		geminiRequest.Tools = []ChatTools{
 			{
 				FunctionDeclarations: textRequest.Functions,
@@ -123,6 +134,29 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 	return &geminiRequest
 }
 
+func ConvertEmbeddingRequest(request model.GeneralOpenAIRequest) *BatchEmbeddingRequest {
+	inputs := request.ParseInput()
+	requests := make([]EmbeddingRequest, len(inputs))
+	model := fmt.Sprintf("models/%s", request.Model)
+
+	for i, input := range inputs {
+		requests[i] = EmbeddingRequest{
+			Model: model,
+			Content: ChatContent{
+				Parts: []Part{
+					{
+						Text: input,
+					},
+				},
+			},
+		}
+	}
+
+	return &BatchEmbeddingRequest{
+		Requests: requests,
+	}
+}
+
 type ChatResponse struct {
 	Candidates     []ChatCandidate    `json:"candidates"`
 	PromptFeedback ChatPromptFeedback `json:"promptFeedback"`
@@ -154,6 +188,30 @@ type ChatPromptFeedback struct {
 	SafetyRatings []ChatSafetyRating `json:"safetyRatings"`
 }
 
+func getToolCalls(candidate *ChatCandidate) []model.Tool {
+	var toolCalls []model.Tool
+
+	item := candidate.Content.Parts[0]
+	if item.FunctionCall == nil {
+		return toolCalls
+	}
+	argsBytes, err := json.Marshal(item.FunctionCall.Arguments)
+	if err != nil {
+		logger.FatalLog("getToolCalls failed: " + err.Error())
+		return toolCalls
+	}
+	toolCall := model.Tool{
+		Id:   fmt.Sprintf("call_%s", random.GetUUID()),
+		Type: "function",
+		Function: model.Function{
+			Arguments: string(argsBytes),
+			Name:      item.FunctionCall.FunctionName,
+		},
+	}
+	toolCalls = append(toolCalls, toolCall)
+	return toolCalls
+}
+
 func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 	fullTextResponse := openai.TextResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
@@ -165,13 +223,19 @@ func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 		choice := openai.TextResponseChoice{
 			Index: i,
 			Message: model.Message{
-				Role:    "assistant",
-				Content: "",
+				Role: "assistant",
 			},
 			FinishReason: constant.StopFinishReason,
 		}
 		if len(candidate.Content.Parts) > 0 {
-			choice.Message.Content = candidate.Content.Parts[0].Text
+			if candidate.Content.Parts[0].FunctionCall != nil {
+				choice.Message.ToolCalls = getToolCalls(&candidate)
+			} else {
+				choice.Message.Content = candidate.Content.Parts[0].Text
+			}
+		} else {
+			choice.Message.Content = ""
+			choice.FinishReason = candidate.FinishReason
 		}
 		fullTextResponse.Choices = append(fullTextResponse.Choices, choice)
 	}
@@ -181,18 +245,35 @@ func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 func streamResponseGeminiChat2OpenAI(geminiResponse *ChatResponse) *openai.ChatCompletionsStreamResponse {
 	var choice openai.ChatCompletionsStreamResponseChoice
 	choice.Delta.Content = geminiResponse.GetResponseText()
-	choice.FinishReason = &constant.StopFinishReason
+	//choice.FinishReason = &constant.StopFinishReason
 	var response openai.ChatCompletionsStreamResponse
+	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
+	response.Created = helper.GetTimestamp()
 	response.Object = "chat.completion.chunk"
 	response.Model = "gemini"
 	response.Choices = []openai.ChatCompletionsStreamResponseChoice{choice}
 	return &response
 }
 
+func embeddingResponseGemini2OpenAI(response *EmbeddingResponse) *openai.EmbeddingResponse {
+	openAIEmbeddingResponse := openai.EmbeddingResponse{
+		Object: "list",
+		Data:   make([]openai.EmbeddingResponseItem, 0, len(response.Embeddings)),
+		Model:  "gemini-embedding",
+		Usage:  model.Usage{TotalTokens: 0},
+	}
+	for _, item := range response.Embeddings {
+		openAIEmbeddingResponse.Data = append(openAIEmbeddingResponse.Data, openai.EmbeddingResponseItem{
+			Object:    `embedding`,
+			Index:     0,
+			Embedding: item.Values,
+		})
+	}
+	return &openAIEmbeddingResponse
+}
+
 func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, string) {
 	responseText := ""
-	dataChan := make(chan string)
-	stopChan := make(chan bool)
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if atEOF && len(data) == 0 {
@@ -206,14 +287,16 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		}
 		return 0, nil, nil
 	})
+	dataChan := make(chan string)
+	stopChan := make(chan bool)
 	go func() {
 		for scanner.Scan() {
 			data := scanner.Text()
 			data = strings.TrimSpace(data)
-			if !strings.HasPrefix(data, "\"text\": \"") {
+			if !strings.HasPrefix(data, "data: ") {
 				continue
 			}
-			data = strings.TrimPrefix(data, "\"text\": \"")
+			data = strings.TrimPrefix(data, "data: ")
 			data = strings.TrimSuffix(data, "\"")
 			dataChan <- data
 		}
@@ -223,23 +306,17 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 	c.Stream(func(w io.Writer) bool {
 		select {
 		case data := <-dataChan:
-			// this is used to prevent annoying \ related format bug
-			data = fmt.Sprintf("{\"content\": \"%s\"}", data)
-			type dummyStruct struct {
-				Content string `json:"content"`
+			var geminiResponse ChatResponse
+			err := json.Unmarshal([]byte(data), &geminiResponse)
+			if err != nil {
+				logger.SysError("error unmarshalling stream response: " + err.Error())
+				return true
 			}
-			var dummy dummyStruct
-			err := json.Unmarshal([]byte(data), &dummy)
-			responseText += dummy.Content
-			var choice openai.ChatCompletionsStreamResponseChoice
-			choice.Delta.Content = dummy.Content
-			response := openai.ChatCompletionsStreamResponse{
-				Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
-				Object:  "chat.completion.chunk",
-				Created: helper.GetTimestamp(),
-				Model:   "gemini-pro",
-				Choices: []openai.ChatCompletionsStreamResponseChoice{choice},
+			response := streamResponseGeminiChat2OpenAI(&geminiResponse)
+			if response == nil {
+				return true
 			}
+			responseText += response.Choices[0].Delta.StringContent()
 			jsonResponse, err := json.Marshal(response)
 			if err != nil {
 				logger.SysError("error marshalling stream response: " + err.Error())
@@ -301,4 +378,40 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, err = c.Writer.Write(jsonResponse)
 	return nil, &usage
+}
+
+func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+	var geminiEmbeddingResponse EmbeddingResponse
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
+	}
+	err = json.Unmarshal(responseBody, &geminiEmbeddingResponse)
+	if err != nil {
+		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
+	}
+	if geminiEmbeddingResponse.Error != nil {
+		return &model.ErrorWithStatusCode{
+			Error: model.Error{
+				Message: geminiEmbeddingResponse.Error.Message,
+				Type:    "gemini_error",
+				Param:   "",
+				Code:    geminiEmbeddingResponse.Error.Code,
+			},
+			StatusCode: resp.StatusCode,
+		}, nil
+	}
+	fullTextResponse := embeddingResponseGemini2OpenAI(&geminiEmbeddingResponse)
+	jsonResponse, err := json.Marshal(fullTextResponse)
+	if err != nil {
+		return openai.ErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
+	}
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(resp.StatusCode)
+	_, err = c.Writer.Write(jsonResponse)
+	return nil, &fullTextResponse.Usage
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/controller"
@@ -23,7 +24,7 @@ var buildFS embed.FS
 
 func main() {
 	logger.SetupLogger()
-	logger.SysLog(fmt.Sprintf("One API %s started", common.Version))
+	logger.SysLogf("One API %s started", common.Version)
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -71,7 +72,7 @@ func main() {
 	}
 	if config.MemoryCacheEnabled {
 		logger.SysLog("memory cache enabled")
-		logger.SysError(fmt.Sprintf("sync frequency: %d seconds", config.SyncFrequency))
+		logger.SysLog(fmt.Sprintf("sync frequency: %d seconds", config.SyncFrequency))
 		model.InitChannelCache()
 	}
 	if config.MemoryCacheEnabled {
@@ -94,6 +95,7 @@ func main() {
 		logger.SysLog("metric enabled, will disable channel if too much request failed")
 	}
 	openai.InitTokenEncoders()
+	client.Init()
 
 	// Initialize HTTP server
 	server := gin.New()

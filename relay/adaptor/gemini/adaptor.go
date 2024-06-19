@@ -3,6 +3,9 @@ package gemini
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -10,8 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
-	"io"
-	"net/http"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 type Adaptor struct {
@@ -22,10 +24,17 @@ func (a *Adaptor) Init(meta *meta.Meta) {
 }
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
-	version := helper.AssignOrDefault(meta.APIVersion, config.GeminiVersion)
-	action := "generateContent"
+	version := helper.AssignOrDefault(meta.Config.APIVersion, config.GeminiVersion)
+	action := ""
+	switch meta.Mode {
+	case relaymode.Embeddings:
+		action = "batchEmbedContents"
+	default:
+		action = "generateContent"
+	}
+
 	if meta.IsStream {
-		action = "streamGenerateContent"
+		action = "streamGenerateContent?alt=sse"
 	}
 	return fmt.Sprintf("%s/%s/models/%s:%s", meta.BaseURL, version, meta.ActualModelName, action), nil
 }
@@ -40,7 +49,14 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	return ConvertRequest(*request), nil
+	switch relayMode {
+	case relaymode.Embeddings:
+		geminiEmbeddingRequest := ConvertEmbeddingRequest(*request)
+		return geminiEmbeddingRequest, nil
+	default:
+		geminiRequest := ConvertRequest(*request)
+		return geminiRequest, nil
+	}
 }
 
 func (a *Adaptor) ConvertImageRequest(request *model.ImageRequest) (any, error) {
@@ -60,7 +76,12 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		err, responseText = StreamHandler(c, resp)
 		usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
 	} else {
-		err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		switch meta.Mode {
+		case relaymode.Embeddings:
+			err, usage = EmbeddingHandler(c, resp)
+		default:
+			err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		}
 	}
 	return
 }

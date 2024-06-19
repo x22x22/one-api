@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/relay/adaptor"
+	"github.com/songquanpeng/one-api/relay/adaptor/doubao"
 	"github.com/songquanpeng/one-api/relay/adaptor/minimax"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -29,13 +30,13 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		if meta.Mode == relaymode.ImagesGenerations {
 			// https://learn.microsoft.com/en-us/azure/ai-services/openai/dall-e-quickstart?tabs=dalle3%2Ccommand-line&pivots=rest-api
 			// https://{resource_name}.openai.azure.com/openai/deployments/dall-e-3/images/generations?api-version=2024-03-01-preview
-			fullRequestURL := fmt.Sprintf("%s/openai/deployments/%s/images/generations?api-version=%s", meta.BaseURL, meta.ActualModelName, meta.APIVersion)
+			fullRequestURL := fmt.Sprintf("%s/openai/deployments/%s/images/generations?api-version=%s", meta.BaseURL, meta.ActualModelName, meta.Config.APIVersion)
 			return fullRequestURL, nil
 		}
 
 		// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/chatgpt-quickstart?pivots=rest-api&tabs=command-line#rest-api
 		requestURL := strings.Split(meta.RequestURLPath, "?")[0]
-		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, meta.APIVersion)
+		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, meta.Config.APIVersion)
 		task := strings.TrimPrefix(requestURL, "/v1/")
 		model_ := meta.ActualModelName
 		model_ = strings.Replace(model_, ".", "", -1)
@@ -45,6 +46,8 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		return GetFullRequestURL(meta.BaseURL, requestURL, meta.ChannelType), nil
 	case channeltype.Minimax:
 		return minimax.GetRequestURL(meta)
+	case channeltype.Doubao:
+		return doubao.GetRequestURL(meta)
 	default:
 		return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), nil
 	}
@@ -86,8 +89,12 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	if meta.IsStream {
 		var responseText string
 		err, responseText, usage = StreamHandler(c, resp, meta.Mode)
-		if usage == nil {
+		if usage == nil || usage.TotalTokens == 0 {
 			usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+		}
+		if usage.TotalTokens != 0 && usage.PromptTokens == 0 { // some channels don't return prompt tokens & completion tokens
+			usage.PromptTokens = meta.PromptTokens
+			usage.CompletionTokens = usage.TotalTokens - meta.PromptTokens
 		}
 	} else {
 		switch meta.Mode {

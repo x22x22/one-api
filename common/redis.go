@@ -10,6 +10,7 @@ import (
 
 var RDB *redis.Client
 var RedisEnabled = true
+var RedisLLMEnabled = true
 
 // InitRedisClient This function is called after init()
 func InitRedisClient() (err error) {
@@ -21,6 +22,11 @@ func InitRedisClient() (err error) {
 	if os.Getenv("SYNC_FREQUENCY") == "" {
 		RedisEnabled = false
 		logger.SysLog("SYNC_FREQUENCY not set, Redis is disabled")
+		return nil
+	}
+	if os.Getenv("REDIS_CONN_STRING") == "" || os.Getenv("REDIS_LLM_ENABLED") == "" {
+		RedisLLMEnabled = false
+		logger.SysLog("REDIS_CONN_STRING or REDIS_LLM_ENABLED not set, LLM cache use file cache.")
 		return nil
 	}
 	logger.SysLog("Redis is enabled")

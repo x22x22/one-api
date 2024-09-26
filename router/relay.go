@@ -17,11 +17,15 @@ func SetRelayRouter(router *gin.Engine) {
 		modelsRouter.GET("/:model", controller.RetrieveModel)
 	}
 	relayV1Router := router.Group("/v1")
-	relayV1Router.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.Distribute(), middleware.LLMCache())
+	relayV1Router.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.Distribute())
+	relayV2CompletionsRouter := relayV1Router
+	relayV2CompletionsRouter.Use(middleware.LLMCache())
+	{
+		relayV2CompletionsRouter.POST("/completions", controller.Relay)
+		relayV2CompletionsRouter.POST("/chat/completions", controller.Relay)
+	}
 	{
 		relayV1Router.Any("/oneapi/proxy/:channelid/*target", controller.Relay)
-		relayV1Router.POST("/completions", controller.Relay)
-		relayV1Router.POST("/chat/completions", controller.Relay)
 		relayV1Router.POST("/edits", controller.Relay)
 		relayV1Router.POST("/images/generations", controller.Relay)
 		relayV1Router.POST("/images/edits", controller.RelayNotImplemented)

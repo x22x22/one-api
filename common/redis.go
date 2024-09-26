@@ -5,17 +5,20 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/songquanpeng/one-api/common/logger"
 	"os"
+	"strconv"
 	"time"
 )
 
 var RDB *redis.Client
 var RedisEnabled = true
 var RedisLLMEnabled = true
+var RedisLLMTTL = time.Duration(-1)
 
 // InitRedisClient This function is called after init()
 func InitRedisClient() (err error) {
 	if os.Getenv("REDIS_CONN_STRING") == "" {
 		RedisEnabled = false
+		RedisLLMEnabled = false
 		logger.SysLog("REDIS_CONN_STRING not set, Redis is not enabled")
 		return nil
 	}
@@ -24,10 +27,19 @@ func InitRedisClient() (err error) {
 		logger.SysLog("SYNC_FREQUENCY not set, Redis is disabled")
 		return nil
 	}
-	if os.Getenv("REDIS_CONN_STRING") == "" || os.Getenv("REDIS_LLM_ENABLED") == "" {
+	if os.Getenv("REDIS_LLM_ENABLED") == "" {
 		RedisLLMEnabled = false
 		logger.SysLog("REDIS_CONN_STRING or REDIS_LLM_ENABLED not set, LLM cache use file cache.")
-		return nil
+	}
+	ttlStr := os.Getenv("RedisLLMTTL")
+
+	if ttlStr != "" {
+		ttl, err := strconv.Atoi(ttlStr)
+		if err != nil {
+			logger.SysError(err.Error())
+		} else {
+			RedisLLMTTL = time.Duration(ttl) * time.Second
+		}
 	}
 	logger.SysLog("Redis is enabled")
 	opt, err := redis.ParseURL(os.Getenv("REDIS_CONN_STRING"))

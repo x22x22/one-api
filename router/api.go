@@ -117,5 +117,11 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			groupRoute.GET("/", controller.GetGroups)
 		}
+		llmCacheRoute := apiRouter.Group("/llm-cache")
+		llmCacheRoute.Use(middleware.UserAuth())
+		{
+			llmCacheRoute.POST("/", controller.GetLLMCache)
+			llmCacheRoute.DELETE("/", controller.DeleteLLMCache)
+		}
 	}
 }

@@ -6,16 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/logger"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/logger"
 )
 
 type CacheData struct {
@@ -150,7 +148,7 @@ func LLMCache(cacheDir ...string) gin.HandlerFunc {
 
 				if len(cacheDataBytes) > 0 {
 					if common.RedisLLMEnabled {
-						err := common.RedisSet(cacheKey, string(cacheDataBytes), 24*time.Hour)
+						err := common.RedisSet(cacheKey, string(cacheDataBytes), common.RedisLLMTTL)
 						if err != nil {
 							logger.SysError("Failed to set Redis cache: " + err.Error())
 						}

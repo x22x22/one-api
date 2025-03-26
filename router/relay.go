@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/controller"
 	"github.com/songquanpeng/one-api/middleware"
 
@@ -18,19 +19,22 @@ func SetRelayRouter(router *gin.Engine) {
 	}
 	relayV1Router := router.Group("/v1")
 	relayV1Router.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.Distribute())
-	relayV2CompletionsRouter := relayV1Router
-	relayV2CompletionsRouter.Use(middleware.LLMCache())
-	{
-		relayV2CompletionsRouter.POST("/completions", controller.Relay)
-		relayV2CompletionsRouter.POST("/chat/completions", controller.Relay)
+	relayV1CompletionsRouter := relayV1Router.Group("")
+	relayV1EmbeddingsRouter := relayV1Router.Group("")
+	if common.EnableTrace {
+		relayV1CompletionsRouter.Use(middleware.ChatCompletionsTrace())
+		relayV1EmbeddingsRouter.Use(middleware.EmbeddingsTrace())
 	}
+	relayV1CompletionsRouter.Use(middleware.LLMCache())
 	{
+		relayV1CompletionsRouter.POST("/chat/completions", controller.Relay)
+		relayV1EmbeddingsRouter.POST("/embeddings", controller.Relay)
 		relayV1Router.Any("/oneapi/proxy/:channelid/*target", controller.Relay)
+		relayV1Router.POST("/completions", controller.Relay)
 		relayV1Router.POST("/edits", controller.Relay)
 		relayV1Router.POST("/images/generations", controller.Relay)
 		relayV1Router.POST("/images/edits", controller.RelayNotImplemented)
 		relayV1Router.POST("/images/variations", controller.RelayNotImplemented)
-		relayV1Router.POST("/embeddings", controller.Relay)
 		relayV1Router.POST("/engines/:model/embeddings", controller.Relay)
 		relayV1Router.POST("/audio/transcriptions", controller.Relay)
 		relayV1Router.POST("/audio/translations", controller.Relay)

@@ -57,6 +57,9 @@ func main() {
 		logger.FatalLog("failed to initialize Redis: " + err.Error())
 	}
 
+	common.InitTrace()
+	common.InitLLMCache()
+
 	// Initialize options
 	model.InitOptionMap()
 	logger.SysLog(fmt.Sprintf("using theme %s", config.Theme))

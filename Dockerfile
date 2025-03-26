@@ -5,18 +5,18 @@ COPY ./VERSION .
 COPY ./web .
 
 WORKDIR /web/default
-RUN npm install
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat VERSION) npm run build
+RUN npm install --registry=https://registry.npmmirror.com
+RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(head -n 1 VERSION) npm run build
 
 WORKDIR /web/berry
-RUN npm install
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat VERSION) npm run build
+RUN npm install --registry=https://registry.npmmirror.com
+RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(head -n 1 VERSION) npm run build
 
 WORKDIR /web/air
-RUN npm install
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat VERSION) npm run build
+RUN npm install --registry=https://registry.npmmirror.com
+RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(head -n 1 VERSION) npm run build
 
-FROM golang:alpine AS builder2
+FROM golang:1.23.1-alpine3.20 AS builder2
 
 RUN apk add --no-cache g++
 
@@ -26,10 +26,10 @@ ENV GO111MODULE=on \
 
 WORKDIR /build
 ADD go.mod go.sum ./
-RUN go mod download
+RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct && go mod download
 COPY . .
 COPY --from=builder /web/build ./web/build
-RUN go build -trimpath -ldflags "-s -w -X 'github.com/songquanpeng/one-api/common.Version=$(cat VERSION)' -extldflags '-static'" -o one-api
+RUN go build -trimpath -ldflags "-s -w -X 'github.com/songquanpeng/one-api/common.Version=$(head -n 1 VERSION)' -extldflags '-static'" -o one-api
 
 FROM alpine
 

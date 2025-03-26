@@ -58,3 +58,11 @@ func isModelInList(modelName string, models string) bool {
 	}
 	return false
 }
+
+func SubString(str string, start, end int) string {
+	if start < 0 || end > len([]rune(str)) || start > end {
+		return ""
+	}
+	runes := []rune(str)
+	return string(runes[start:end])
+}

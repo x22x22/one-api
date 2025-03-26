@@ -17,13 +17,13 @@ import (
 )
 
 type CacheData struct {
-	Auth     *string                `json:"auth,omitempty"`
+	Auth     string                 `json:"auth,omitempty"`
 	Request  map[string]interface{} `json:"request"`
 	Response interface{}            `json:"response"`
 }
 
 type CacheDataStream struct {
-	Auth     *string                `json:"auth,omitempty"`
+	Auth     string                 `json:"auth,omitempty"`
 	Request  map[string]interface{} `json:"request"`
 	Response interface{}            `string:"response"`
 }
@@ -35,7 +35,17 @@ func LLMCache(cacheDir ...string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		if c.GetHeader("Content-Type") != "application/json" {
+		// 检查域名是否匹配 NO_CACHE_DOMAIN
+		noCacheDomain := common.NoCacheDomain
+		if noCacheDomain != "" {
+			requestHost := c.Request.Host
+			if strings.Contains(requestHost, noCacheDomain) {
+				c.Next()
+				return
+			}
+		}
+
+		if !strings.Contains(c.GetHeader("Content-Type"), "application/json") {
 			c.Next()
 			return
 		}
@@ -59,11 +69,7 @@ func LLMCache(cacheDir ...string) gin.HandlerFunc {
 			isStream = true
 		}
 
-		var auth *string
-		authValue := c.GetHeader("Authorization")
-		if authValue != "" {
-			auth = &authValue
-		}
+		auth := c.Keys["authorization"].(string)
 
 		miss := true
 		var cacheData []byte

@@ -1,7 +1,9 @@
 module github.com/songquanpeng/one-api
 
 // +heroku goVersion go1.18
-go 1.20
+go 1.21.1
+
+toolchain go1.23.1
 
 require (
 	cloud.google.com/go/iam v1.1.10
@@ -25,6 +27,7 @@ require (
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.9.0
+	github.com/x22x22/langfuse-go v0.0.4
 	golang.org/x/crypto v0.24.0
 	golang.org/x/image v0.18.0
 	google.golang.org/api v0.187.0
@@ -109,3 +112,5 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+//replace github.com/x22x22/langfuse-go => ../langfuse-go

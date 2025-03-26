@@ -8,3 +8,12 @@ func event2StopReason(e *string) string {
 	}
 	return "stop"
 }
+
+// V3 API事件转换为停止原因
+func v3Event2StopReason(eventName string) string {
+	if eventName == "conversation.chat.completed" ||
+		eventName == "conversation.message.completed" {
+		return "stop"
+	}
+	return ""
+}

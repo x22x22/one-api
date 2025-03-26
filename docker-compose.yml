@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   one-api:
-    image: "${REGISTRY:-docker.io}/justsong/one-api:latest"
+    image: "${REGISTRY:-docker.io}/justsong/one-api:v0.6.11-alpha.8"
     container_name: one-api
     restart: always
     command: --log-dir /app/logs
@@ -29,8 +29,10 @@ services:
       retries: 3
 
   redis:
-    image: "${REGISTRY:-docker.io}/redis:latest"
+    image: "${REGISTRY:-docker.io}/redis:7.4.2-bookworm"
     container_name: redis
+    ports:
+      - '6379:6379'
     restart: always
 
   db:

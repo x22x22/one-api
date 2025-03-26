@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/songquanpeng/one-api/common/render"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/songquanpeng/one-api/common/render"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
@@ -43,9 +44,18 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 		User:   textRequest.User,
 		BotId:  strings.TrimPrefix(textRequest.Model, "bot-"),
 	}
+	var systemContent string
 	for i, message := range textRequest.Messages {
+		if message.Role == "system" {
+			systemContent = message.StringContent()
+			continue
+		}
 		if i == len(textRequest.Messages)-1 {
-			cozeRequest.Query = message.StringContent()
+			if systemContent != "" {
+				cozeRequest.Query = fmt.Sprintf("<system>\n%s\n</system>\n%s", systemContent, message.StringContent())
+			} else {
+				cozeRequest.Query = message.StringContent()
+			}
 			continue
 		}
 		cozeMessage := Message{
